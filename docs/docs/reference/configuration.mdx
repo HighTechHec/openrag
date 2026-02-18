@@ -159,9 +159,7 @@ Configure general system components, session management, and logging.
 | `LANGFLOW_WORKERS` | `1` | Number of Langflow worker processes for concurrent request handling. Be mindful of hardware limitations to avoid overtaxing system resources. |
 | `DOCLING_WORKERS` | `1` | Number of Docling worker processes for concurrent request handling. Be mindful of hardware limitations to avoid overtaxing system resources. |
 | `ACCESS_LOG` | `true` | Whether to enable access logging for OpenRAG services, such as `INFO: 127.0.0.1:45132 - "GET /tasks HTTP/1.1" 200 OK`. Access logs provide information about incoming requests, and they can be useful for monitoring and debugging. |
-
-<!-- | `LOG_FORMAT` | Not set | Set to `json` to enabled JSON-formatted log output. If this variable isn't set, then the default logging format is used. | -->
-<!-- | `LOG_LEVEL` | `INFO` | Logging level. Can be one of `DEBUG`, `INFO`, `WARNING`, or `ERROR`. `DEBUG` provides the most detailed logs but can impact performance. | -->
-<!-- | `SERVICE_NAME` | `openrag` | Service name for logging. | -->
-<!-- | `SESSION_SECRET` | Automatically generated | Session management. | -->
-<!-- TBD: OPENRAG_VERSION -->
+| `LOG_FORMAT` | `json` | Set to `json` to enable JSON-formatted log output, or `text` for standard text logs. |
+| `LOG_LEVEL` | `INFO` | Logging level. Can be one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. `DEBUG` provides the most detailed logs but can impact performance. |
+| `SERVICE_NAME` | `openrag` | Service name used in log entries. |
+| `SESSION_SECRET` | Automatically generated | Secret key for session management. If not provided, a secure random key is generated automatically. |
