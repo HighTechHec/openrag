@@ -78,7 +78,7 @@ export const DeleteConfirmationDialog: React.FC<
             )}
             <DialogTitle>{title}</DialogTitle>
           </div>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription className="!max-h-80 overflow-y-scroll py-6">{description}</DialogDescription>
         </DialogHeader>
 
         <DialogFooter>
