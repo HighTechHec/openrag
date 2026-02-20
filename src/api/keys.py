@@ -55,7 +55,7 @@ async def create_key_endpoint(
             user_id=user.user_id,
             user_email=user.email,
             name=name,
-            jwt_token=None,
+            jwt_token=user.jwt_token,
         )
 
         if result.get("success"):
@@ -84,7 +84,7 @@ async def revoke_key_endpoint(
     result = await api_key_service.revoke_key(
         user_id=user.user_id,
         key_id=key_id,
-        jwt_token=None,
+        jwt_token=user.jwt_token,
     )
 
     if result.get("success"):
@@ -110,7 +110,7 @@ async def delete_key_endpoint(
     result = await api_key_service.delete_key(
         user_id=user.user_id,
         key_id=key_id,
-        jwt_token=None,
+        jwt_token=user.jwt_token,
     )
 
     if result.get("success"):
