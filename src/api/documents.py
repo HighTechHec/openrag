@@ -21,7 +21,6 @@ async def _ensure_index_exists():
 
 async def check_filename_exists(
     filename: str,
-    document_service=Depends(get_session_manager),  # unused but kept for compatibility
     session_manager=Depends(get_session_manager),
     user: User = Depends(get_current_user),
 ):
