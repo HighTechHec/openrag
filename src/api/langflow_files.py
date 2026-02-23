@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import Depends, File, Form, UploadFile
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from dependencies import (
     get_langflow_file_service,

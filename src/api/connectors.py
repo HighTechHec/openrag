@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 from fastapi import Depends, Request
 from pydantic import BaseModel
-from starlette.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from connectors.sharepoint.utils import is_valid_sharepoint_url
 from config.settings import get_index_name
 from utils.logging_config import get_logger

@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from fastapi import Depends, File, Form, UploadFile
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from api.router import upload_ingest_router
 from utils.logging_config import get_logger

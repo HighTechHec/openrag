@@ -1,6 +1,6 @@
 from fastapi import Depends
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 
 from dependencies import get_session_manager, get_current_user

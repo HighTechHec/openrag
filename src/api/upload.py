@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 import boto3
 from fastapi import Depends, File, Form, UploadFile
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from dependencies import (
     get_document_service,

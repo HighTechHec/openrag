@@ -2,7 +2,7 @@ from typing import Optional, Any, Dict
 
 from fastapi import Depends
 from pydantic import BaseModel
-from starlette.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from utils.logging_config import get_logger
 
 from dependencies import get_chat_service, get_session_manager, get_current_user

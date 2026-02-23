@@ -1,7 +1,7 @@
 import json
 import platform
 from fastapi import Depends, Request, HTTPException
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from utils.container_utils import transform_localhost_url
 from utils.logging_config import get_logger

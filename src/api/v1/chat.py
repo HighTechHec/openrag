@@ -9,7 +9,7 @@ from typing import Optional, Any, Dict
 
 from fastapi import Depends
 from pydantic import BaseModel
-from starlette.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from utils.logging_config import get_logger
 from auth_context import set_search_filters, set_search_limit, set_score_threshold, set_auth_context
 from dependencies import get_chat_service, get_session_manager, get_api_key_user_async

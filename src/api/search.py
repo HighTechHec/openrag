@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from fastapi import Depends
 from pydantic import BaseModel, Field
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 
 from dependencies import get_search_service, get_session_manager, get_current_user

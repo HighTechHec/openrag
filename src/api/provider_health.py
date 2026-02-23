@@ -4,7 +4,7 @@ import asyncio
 from typing import Optional
 import httpx
 from fastapi import Depends
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 from config.settings import get_openrag_config
 from api.provider_validation import validate_provider_setup

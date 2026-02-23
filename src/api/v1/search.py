@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import Depends
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 from dependencies import get_search_service, get_api_key_user_async
 from session_manager import User

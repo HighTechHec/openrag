@@ -1,5 +1,5 @@
 from fastapi import Depends
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.telemetry import TelemetryClient, Category, MessageId
 
 from dependencies import get_task_service, get_current_user

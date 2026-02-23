@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import Depends, Request
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.telemetry import TelemetryClient, Category, MessageId
 
 from dependencies import (

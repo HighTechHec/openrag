@@ -6,7 +6,7 @@ to create, list, and revoke their API keys for use with the public API.
 """
 from fastapi import Depends
 from pydantic import BaseModel, Field
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 
 from dependencies import get_api_key_service, get_current_user

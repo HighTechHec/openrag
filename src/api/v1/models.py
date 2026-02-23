@@ -5,7 +5,7 @@ Lists available LLM and embedding models per provider.
 Uses API key authentication. Uses stored credentials from config.
 """
 from fastapi import Depends
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from config.settings import get_openrag_config
 from utils.logging_config import get_logger
 from dependencies import get_models_service, get_api_key_user_async

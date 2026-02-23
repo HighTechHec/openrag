@@ -2,7 +2,7 @@
 from typing import Literal
 
 from fastapi import Depends
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 
 from dependencies import get_flows_service, get_current_user

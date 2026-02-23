@@ -2,7 +2,7 @@ from typing import Optional, Any, List
 
 from fastapi import Depends, Request
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 import uuid
 import json
 from datetime import datetime

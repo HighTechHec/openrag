@@ -6,7 +6,7 @@ import tempfile
 from typing import List, Optional
 
 from fastapi import Depends, File, Form, UploadFile
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from config.settings import DISABLE_INGEST_WITH_LANGFLOW
 from dependencies import (

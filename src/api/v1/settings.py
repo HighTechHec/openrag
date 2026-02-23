@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import Depends
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
 from config.settings import get_openrag_config
 from dependencies import get_api_key_user_async, get_session_manager

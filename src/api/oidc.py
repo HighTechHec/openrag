@@ -2,7 +2,7 @@ import os
 
 from fastapi import Depends, Request
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 import base64
 from cryptography.hazmat.primitives import serialization
 

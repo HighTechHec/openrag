@@ -13,7 +13,7 @@ from utils.embeddings import create_dynamic_index_body
 from utils.logging_config import configure_from_env, get_logger
 from utils.telemetry import TelemetryClient, Category, MessageId
 from fastapi import FastAPI
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 # Create process pool FIRST, before any torch/CUDA imports
 from utils.process_pool import process_pool  # isort: skip
