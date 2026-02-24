@@ -466,55 +466,67 @@ class AppClients:
             import concurrent.futures
             import threading
 
-            async def probe_and_initialize():
-                # Try HTTP/2 first (default)
-                client_http2 = patch_openai_with_mcp(AsyncOpenAI())
-                logger.info("Probing OpenAI client with HTTP/2...")
+            async def probe_http2():
+                """Returns True if HTTP/2 works, False to fall back to HTTP/1.1.
 
+                Closes the probe client before returning so all connections are
+                drained within the probe thread's event loop.  The actual
+                production client is created after this thread exits, in the
+                caller's event loop, avoiding cross-loop SSL transport errors.
+                """
+                client = AsyncOpenAI()
+                logger.info("Probing OpenAI client with HTTP/2...")
                 try:
-                    # Probe with a small embedding and short timeout
                     await asyncio.wait_for(
-                        client_http2.embeddings.create(
+                        client.embeddings.create(
                             model='text-embedding-3-small',
                             input=['test']
                         ),
                         timeout=5.0
                     )
-                    logger.info("OpenAI client initialized with HTTP/2 (probe successful)")
-                    return client_http2
+                    logger.info("HTTP/2 probe successful")
+                    return True
                 except (asyncio.TimeoutError, Exception) as probe_error:
                     logger.warning("HTTP/2 probe failed, falling back to HTTP/1.1", error=str(probe_error))
-                    # Close the HTTP/2 client
+                    return False
+                finally:
+                    # Always close the probe client so its connections are fully
+                    # torn down before the thread's event loop is closed.
                     try:
-                        await client_http2.close()
+                        await client.close()
                     except Exception:
                         pass
-
-                    # Fall back to HTTP/1.1 with explicit timeout settings
-                    http_client = httpx.AsyncClient(
-                        http2=False,
-                        timeout=httpx.Timeout(60.0, connect=10.0)
-                    )
-                    client_http1 = patch_openai_with_mcp(
-                        AsyncOpenAI(http_client=http_client)
-                    )
-                    logger.info("OpenAI client initialized with HTTP/1.1 (fallback)")
-                    return client_http1
 
             def run_probe_in_thread():
                 """Run the async probe in a new thread with its own event loop"""
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
-                    return loop.run_until_complete(probe_and_initialize())
+                    return loop.run_until_complete(probe_http2())
                 finally:
                     loop.close()
 
             try:
-                # Run the probe in a separate thread with its own event loop
+                # Run the probe in a separate thread with its own event loop.
+                # Only the probe result (bool) crosses the thread boundary;
+                # the production client is created here so its connections are
+                # bound to the caller's event loop, not the (now closed) probe loop.
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                     future = executor.submit(run_probe_in_thread)
-                    self._patched_async_client = future.result(timeout=15)
+                    use_http2 = future.result(timeout=15)
+
+                if use_http2:
+                    self._patched_async_client = patch_openai_with_mcp(AsyncOpenAI())
+                    logger.info("OpenAI client initialized with HTTP/2")
+                else:
+                    http_client = httpx.AsyncClient(
+                        http2=False,
+                        timeout=httpx.Timeout(60.0, connect=10.0)
+                    )
+                    self._patched_async_client = patch_openai_with_mcp(
+                        AsyncOpenAI(http_client=http_client)
+                    )
+                    logger.info("OpenAI client initialized with HTTP/1.1 (fallback)")
                 logger.info("Successfully initialized OpenAI client")
             except Exception as e:
                 logger.error(f"Failed to initialize OpenAI client: {e.__class__.__name__}: {str(e)}")
