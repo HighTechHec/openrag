@@ -170,14 +170,19 @@ async def chat_get_endpoint(
         if not conversation:
             return JSONResponse({"error": "Conversation not found"}, status_code=404)
 
-        messages = [
-            {
+        # Transform to public API format
+        messages = []
+        for msg in conversation.get("messages", []):
+            message_data = {
                 "role": msg.get("role"),
                 "content": msg.get("content"),
                 "timestamp": msg.get("timestamp"),
             }
-            for msg in conversation.get("messages", [])
-        ]
+            # Include token usage if available (from Responses API)
+            usage = msg.get("response_data", {}).get("usage") if isinstance(msg.get("response_data"), dict) else None
+            if usage:
+                message_data["usage"] = usage
+            messages.append(message_data)
 
         return JSONResponse({
             "chat_id": conversation.get("response_id"),
