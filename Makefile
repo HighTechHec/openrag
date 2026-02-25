@@ -19,7 +19,12 @@ REPO ?= https://github.com/langflow-ai/langflow.git
 
 # Auto-detect container runtime: prefer docker, fall back to podman
 CONTAINER_RUNTIME := $(shell command -v docker >/dev/null 2>&1 && echo "docker" || echo "podman")
-COMPOSE_CMD := $(CONTAINER_RUNTIME) compose --env-file $(ENV_FILE)
+# Only pass --env-file if the file actually exists
+ifneq (,$(wildcard $(ENV_FILE)))
+  COMPOSE_CMD := $(CONTAINER_RUNTIME) compose --env-file $(ENV_FILE)
+else
+  COMPOSE_CMD := $(CONTAINER_RUNTIME) compose
+endif
 
 ######################
 # COLOR DEFINITIONS
