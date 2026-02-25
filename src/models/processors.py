@@ -1,7 +1,10 @@
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from .tasks import UploadTask, FileTask
 from utils.logging_config import get_logger
 from utils.file_utils import get_file_extension, clean_connector_filename
+
+if TYPE_CHECKING:
+    from connectors.base import DocumentACL
 
 logger = get_logger(__name__)
 
@@ -684,7 +687,7 @@ class LangflowFileProcessor(TaskProcessor):
         owner_name: str = None,
         owner_email: str = None,
         session_id: str = None,
-        tweaks: dict = None,
+        runtime_vars: dict = None,
         settings: dict = None,
         delete_after_ingest: bool = True,
         replace_duplicates: bool = False,
@@ -697,7 +700,7 @@ class LangflowFileProcessor(TaskProcessor):
         self.owner_name = owner_name
         self.owner_email = owner_email
         self.session_id = session_id
-        self.tweaks = tweaks or {}
+        self.runtime_vars = runtime_vars or {}
         self.settings = settings
         self.delete_after_ingest = delete_after_ingest
         self.replace_duplicates = replace_duplicates
@@ -772,30 +775,11 @@ class LangflowFileProcessor(TaskProcessor):
                 if hasattr(self.session_manager, '_anonymous_jwt'):
                     effective_jwt = self.session_manager._anonymous_jwt
 
-            # Prepare metadata tweaks similar to API endpoint
-            final_tweaks = self.tweaks.copy() if self.tweaks else {}
-            
-            metadata_tweaks = []
-            if self.owner_user_id:
-                metadata_tweaks.append({"key": "owner", "value": self.owner_user_id})
-            if self.owner_name:
-                metadata_tweaks.append({"key": "owner_name", "value": self.owner_name})
-            if self.owner_email:
-                metadata_tweaks.append({"key": "owner_email", "value": self.owner_email})
-            # Mark as local upload for connector_type
-            metadata_tweaks.append({"key": "connector_type", "value": "local"})
-
-            if metadata_tweaks:
-                # Initialize the OpenSearch component tweaks if not already present
-                if "OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4" not in final_tweaks:
-                    final_tweaks["OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4"] = {}
-                final_tweaks["OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4"]["docs_metadata"] = metadata_tweaks
-
             # Process file using langflow service
             result = await self.langflow_file_service.upload_and_ingest_file(
                 file_tuple=file_tuple,
                 session_id=self.session_id,
-                tweaks=final_tweaks,
+                runtime_vars=self.runtime_vars,
                 settings=self.settings,
                 jwt_token=effective_jwt,
                 delete_after_ingest=self.delete_after_ingest,

@@ -107,9 +107,6 @@ class LangflowConnectorService:
                     "Running Langflow ingestion flow", file_path=langflow_file_path
                 )
 
-                # Use the same tweaks pattern as LangflowFileService
-                tweaks = {}  # Let Langflow handle the ingestion with default settings
-
                 # Extract ACL information from the connector document, if available
                 allowed_users: list[str] = []
                 allowed_groups: list[str] = []
@@ -126,7 +123,6 @@ class LangflowConnectorService:
                     file_paths=[langflow_file_path],
                     file_tuples=[file_tuple],
                     jwt_token=jwt_token,
-                    tweaks=tweaks,
                     owner=owner_user_id,
                     owner_name=owner_name,
                     owner_email=owner_email,

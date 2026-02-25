@@ -59,9 +59,8 @@ Explore the [Langflow documentation](https://docs.langflow.org/) to learn more a
 
 ## Modify a flow at runtime {#modify-a-flow-at-runtime}
 
-You can use _tweaks_ to modify flow settings at runtime without permanently changing the flow's configuration.
-Tweaks are one-time parameter modifications that are passed to specific Langflow components during flow execution.
-For more information on tweaks, see the Langflow documentation on [Input schema (tweaks)](https://docs.langflow.org/concepts-publish#input-schema).
+OpenRAG passes flow runtime values through Langflow global-variable headers (`X-Langflow-Global-Var-*`) on each run request.
+This includes request-scoped values such as ownership metadata, file context, chunking settings, and query filters.
 
 ## Set the Langflow version
 

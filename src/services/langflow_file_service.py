@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional
-import json
 
 from config.settings import LANGFLOW_INGEST_FLOW_ID, clients
 from utils.logging_config import get_logger
@@ -64,7 +63,7 @@ class LangflowFileService:
         file_tuples: list[tuple[str, str, str]],
         jwt_token: str,
         session_id: Optional[str] = None,
-        tweaks: Optional[Dict[str, Any]] = None,
+        runtime_vars: Optional[Dict[str, Any]] = None,
         owner: Optional[str] = None,
         owner_name: Optional[str] = None,
         owner_email: Optional[str] = None,
@@ -87,54 +86,16 @@ class LangflowFileService:
             "input_type": "chat",
             "output_type": "text",  # Changed from "json" to "text"
         }
-        if not tweaks:
-            tweaks = {}
-
-        # Pass files via tweaks to File component (File-PSU37 from the flow)
-        if file_paths:
-            tweaks["DoclingRemote-Dp3PX"] = {"path": file_paths}
-            
-
-
-        # Pass JWT token via tweaks using the x-langflow-global-var- pattern
-        if jwt_token:
-            # Using the global variable pattern that Langflow expects for OpenSearch components
-            tweaks["OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4"] = {"jwt_token": jwt_token}
-            logger.debug("[LF] Added JWT token to tweaks for OpenSearch components")
-        else:
+        if not jwt_token:
             logger.warning("[LF] No JWT token provided")
-
-        # Pass metadata via tweaks to OpenSearch component
-        metadata_tweaks = []
-        if owner or owner is None:
-            metadata_tweaks.append({"key": "owner", "value": owner})
-        if owner_name:
-            metadata_tweaks.append({"key": "owner_name", "value": owner_name})
-        if owner_email:
-            metadata_tweaks.append({"key": "owner_email", "value": owner_email})
-        if connector_type:
-            metadata_tweaks.append({"key": "connector_type", "value": connector_type})
-        logger.info(f"[LF] Metadata tweaks {metadata_tweaks}")
-        # if metadata_tweaks:
-        #     # Initialize the OpenSearch component tweaks if not already present
-        #     if "OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4" not in tweaks:
-        #         tweaks["OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4"] = {}
-        #     tweaks["OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4"]["docs_metadata"] = metadata_tweaks
-        #     logger.debug(
-        #         "[LF] Added metadata to tweaks", metadata_count=len(metadata_tweaks)
-        #     )
-        if tweaks:
-            payload["tweaks"] = tweaks
-            logger.debug(f"[LF] Tweaks {tweaks}")
         if session_id:
             payload["session_id"] = session_id
 
         logger.debug(
-            "[LF] Run ingestion -> /run/%s | files=%s session_id=%s tweaks_keys=%s jwt_present=%s",
+            "[LF] Run ingestion -> /run/%s | files=%s session_id=%s jwt_present=%s",
             self.flow_id_ingest,
             len(file_paths) if file_paths else 0,
             session_id,
-            list(tweaks.keys()) if isinstance(tweaks, dict) else None,
             bool(jwt_token),
         )
         # To compute the file size in bytes, use len() on the file content (which should be bytes)
@@ -147,38 +108,40 @@ class LangflowFileService:
 
         # Get the current embedding model and provider credentials from config
         from config.settings import get_openrag_config
-        from utils.langflow_headers import add_provider_credentials_to_headers
+        from utils.langflow_headers import build_langflow_run_headers
         
         config = get_openrag_config()
         embedding_model = config.knowledge.embedding_model
 
-        headers = {
-            "X-Langflow-Global-Var-JWT": str(jwt_token),
-            "X-Langflow-Global-Var-OWNER": str(owner),
-            "X-Langflow-Global-Var-OWNER_NAME": str(owner_name),
-            "X-Langflow-Global-Var-OWNER_EMAIL": str(owner_email),
-            "X-Langflow-Global-Var-CONNECTOR_TYPE": str(connector_type),
-            "X-Langflow-Global-Var-FILENAME": filename,
-            "X-Langflow-Global-Var-MIMETYPE": mimetype,
-            "X-Langflow-Global-Var-FILESIZE": str(file_size_bytes),
-            "X-Langflow-Global-Var-SELECTED_EMBEDDING_MODEL": str(embedding_model),
-            "X-Langflow-Global-Var-DOCUMENT_ID": str(document_id) if document_id else "",
-            "X-Langflow-Global-Var-SOURCE_URL": str(source_url) if source_url else "",
+        header_runtime_vars: Dict[str, Any] = {
+            "JWT": jwt_token,
+            "OWNER": owner,
+            "OWNER_NAME": owner_name,
+            "OWNER_EMAIL": owner_email,
+            "CONNECTOR_TYPE": connector_type,
+            "FILE_PATH": file_paths[0] if file_paths else None,
+            "FILENAME": filename,
+            "MIMETYPE": mimetype,
+            "FILESIZE": file_size_bytes,
+            "SELECTED_EMBEDDING_MODEL": embedding_model,
+            "DOCUMENT_ID": document_id,
+            "SOURCE_URL": source_url,
         }
 
         # Serialize ACL lists as JSON strings for Langflow global vars
         # (flows will parse these back into lists before indexing)
         if allowed_users is not None:
-            headers["X-Langflow-Global-Var-ALLOWED_USERS"] = json.dumps(
-                allowed_users or []
-            )
+            header_runtime_vars["ALLOWED_USERS"] = allowed_users or []
         if allowed_groups is not None:
-            headers["X-Langflow-Global-Var-ALLOWED_GROUPS"] = json.dumps(
-                allowed_groups or []
-            )
-        
-        # Add provider credentials as global variables for ingestion
-        add_provider_credentials_to_headers(headers, config)
+            header_runtime_vars["ALLOWED_GROUPS"] = allowed_groups or []
+        if runtime_vars:
+            header_runtime_vars.update(runtime_vars)
+
+        headers = build_langflow_run_headers(
+            config=config,
+            runtime_vars=header_runtime_vars,
+            scope="ingest",
+        )
         logger.info(f"[LF] Headers {headers}")
         logger.info(f"[LF] Payload {payload}")
         resp = await clients.langflow_request(
@@ -230,7 +193,7 @@ class LangflowFileService:
         self,
         file_tuple,
         session_id: Optional[str] = None,
-        tweaks: Optional[Dict[str, Any]] = None,
+        runtime_vars: Optional[Dict[str, Any]] = None,
         settings: Optional[Dict[str, Any]] = None,
         jwt_token: Optional[str] = None,
         delete_after_ingest: bool = True,
@@ -246,8 +209,8 @@ class LangflowFileService:
         Args:
             file_tuple: File tuple (filename, content, content_type)
             session_id: Optional session ID for the ingestion flow
-            tweaks: Optional tweaks for the ingestion flow
-            settings: Optional UI settings to convert to component tweaks
+            runtime_vars: Optional runtime global variables for the ingestion flow
+            settings: Optional UI settings to convert to runtime global variables
             jwt_token: Optional JWT token for authentication
             delete_after_ingest: Whether to delete the file from Langflow after ingestion (default: True)
 
@@ -277,44 +240,25 @@ class LangflowFileService:
         if not file_path:
             raise ValueError("Upload successful but no file path returned")
 
-        # Convert UI settings to component tweaks if provided
-        final_tweaks = tweaks.copy() if tweaks else {}
+        final_runtime_vars: Dict[str, Any] = runtime_vars.copy() if runtime_vars else {}
 
         if settings:
             logger.debug(
                 "[LF] Applying ingestion settings", extra={"settings": settings}
             )
 
-            # Split Text component tweaks (SplitText-QIKhg)
-            if (
-                settings.get("chunkSize")
-                or settings.get("chunkOverlap")
-                or settings.get("separator")
-            ):
-                if "SplitText-QIKhg" not in final_tweaks:
-                    final_tweaks["SplitText-QIKhg"] = {}
-                if settings.get("chunkSize"):
-                    final_tweaks["SplitText-QIKhg"]["chunk_size"] = settings[
-                        "chunkSize"
-                    ]
-                if settings.get("chunkOverlap"):
-                    final_tweaks["SplitText-QIKhg"]["chunk_overlap"] = settings[
-                        "chunkOverlap"
-                    ]
-                if settings.get("separator"):
-                    final_tweaks["SplitText-QIKhg"]["separator"] = settings["separator"]
-
-            # OpenAI Embeddings component tweaks (OpenAIEmbeddings-joRJ6)
+            if settings.get("chunkSize"):
+                final_runtime_vars["CHUNK_SIZE"] = settings["chunkSize"]
+            if settings.get("chunkOverlap"):
+                final_runtime_vars["CHUNK_OVERLAP"] = settings["chunkOverlap"]
+            if settings.get("separator"):
+                final_runtime_vars["SEPARATOR"] = settings["separator"]
             if settings.get("embeddingModel"):
-                if "OpenAIEmbeddings-joRJ6" not in final_tweaks:
-                    final_tweaks["OpenAIEmbeddings-joRJ6"] = {}
-                final_tweaks["OpenAIEmbeddings-joRJ6"]["model"] = settings[
-                    "embeddingModel"
-                ]
+                final_runtime_vars["SELECTED_EMBEDDING_MODEL"] = settings["embeddingModel"]
 
             logger.debug(
-                "[LF] Final tweaks with settings applied",
-                extra={"tweaks": final_tweaks},
+                "[LF] Runtime vars with settings applied",
+                extra={"runtime_vars": final_runtime_vars},
             )
 
         # Step 3: Run ingestion
@@ -324,7 +268,7 @@ class LangflowFileService:
                 file_tuples=[file_tuple],
                 jwt_token=jwt_token,
                 session_id=session_id,
-                tweaks=final_tweaks,
+                runtime_vars=final_runtime_vars,
                 owner=owner,
                 owner_name=owner_name,
                 owner_email=owner_email,

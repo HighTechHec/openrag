@@ -179,16 +179,26 @@ spec:
               value: "[]"
             - name: ALLOWED_GROUPS
               value: "[]"
-            - name: OPENRAG-QUERY-FILTER
+            - name: OPENRAG_QUERY_FILTER
               value: {{ .Values.langflow.openragQueryFilter | quote }}
+            - name: FILE_PATH
+              value: ""
             - name: FILENAME
               value: "None"
             - name: MIMETYPE
               value: "None"
             - name: FILESIZE
               value: "0"
+            - name: CHUNK_SIZE
+              value: {{ .Values.langflow.chunkSize | quote }}
+            - name: CHUNK_OVERLAP
+              value: {{ .Values.langflow.chunkOverlap | quote }}
+            - name: SEPARATOR
+              value: {{ .Values.langflow.separator | quote }}
+            - name: IS_SAMPLE_DATA
+              value: {{ .Values.langflow.isSampleData | quote }}
             - name: SELECTED_EMBEDDING_MODEL
-              value: ""
+              value: {{ .Values.appConfig.knowledge.embeddingModel | quote }}
 
             # Secrets from langflow secret
             - name: LANGFLOW_SECRET_KEY

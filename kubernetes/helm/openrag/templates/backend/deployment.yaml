@@ -206,6 +206,10 @@ spec:
                 configMapKeyRef:
                   name: {{ include "openrag.fullname" . }}-flow-ids
                   key: nudges-flow-id
+            - name: CHUNK_SIZE
+              value: {{ .Values.appConfig.knowledge.chunkSize | quote }}
+            - name: CHUNK_OVERLAP
+              value: {{ .Values.appConfig.knowledge.chunkOverlap | quote }}
             # Feature flags
             - name: DISABLE_INGEST_WITH_LANGFLOW
               value: {{ .Values.backend.features.disableIngestWithLangflow | quote }}

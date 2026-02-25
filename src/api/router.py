@@ -26,7 +26,6 @@ async def upload_ingest_router(
     file: List[UploadFile] = File(...),
     session_id: Optional[str] = Form(None),
     settings_json: Optional[str] = Form(None, alias="settings"),
-    tweaks_json: Optional[str] = Form(None, alias="tweaks"),
     delete_after_ingest: str = Form("true"),
     replace_duplicates: str = Form("true"),
     create_filter: str = Form("false"),
@@ -63,7 +62,6 @@ async def upload_ingest_router(
         upload_files=file,
         session_id=session_id,
         settings_json=settings_json,
-        tweaks_json=tweaks_json,
         delete_after_ingest=delete_after_ingest.lower() == "true",
         replace_duplicates=replace_duplicates.lower() == "true",
         create_filter=create_filter.lower() == "true",
@@ -78,7 +76,6 @@ async def _langflow_upload_ingest_task(
     upload_files: List[UploadFile],
     session_id,
     settings_json,
-    tweaks_json,
     delete_after_ingest: bool,
     replace_duplicates: bool,
     create_filter: bool,
@@ -93,19 +90,12 @@ async def _langflow_upload_ingest_task(
             return JSONResponse({"error": "Missing files"}, status_code=400)
 
         settings = None
-        tweaks = None
 
         if settings_json:
             try:
                 settings = json.loads(settings_json)
             except json.JSONDecodeError as e:
                 return JSONResponse({"error": f"Invalid settings JSON: {e}"}, status_code=400)
-
-        if tweaks_json:
-            try:
-                tweaks = json.loads(tweaks_json)
-            except json.JSONDecodeError as e:
-                return JSONResponse({"error": f"Invalid tweaks JSON: {e}"}, status_code=400)
 
         user_id = user.user_id
         user_name = user.name
@@ -139,7 +129,6 @@ async def _langflow_upload_ingest_task(
                 owner_name=user_name,
                 owner_email=user_email,
                 session_id=session_id,
-                tweaks=tweaks,
                 settings=settings,
                 delete_after_ingest=delete_after_ingest,
                 replace_duplicates=replace_duplicates,

@@ -1777,7 +1777,7 @@
                 "tool_mode": false,
                 "trace_as_metadata": true,
                 "type": "str",
-                "value": "OPENRAG-QUERY-FILTER"
+                "value": "OPENRAG_QUERY_FILTER"
               }
             },
             "tool_mode": false

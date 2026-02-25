@@ -391,18 +391,7 @@ async def _ingest_default_documents_langflow(
         if hasattr(session_manager, "_anonymous_jwt"):
             effective_jwt = session_manager._anonymous_jwt
 
-    # Prepare tweaks for default documents with anonymous user metadata
-    default_tweaks = {
-        "OpenSearchVectorStoreComponentMultimodalMultiEmbedding-By9U4": {
-            "docs_metadata": [
-                {"key": "owner", "value": None},
-                {"key": "owner_name", "value": anonymous_user.name},
-                {"key": "owner_email", "value": anonymous_user.email},
-                {"key": "connector_type", "value": "system_default"},
-                {"key": "is_sample_data", "value": "true"},
-            ]
-        }
-    }
+    default_runtime_vars = {"IS_SAMPLE_DATA": "true"}
 
     # Create a langflow upload task for trackable progress
     task_id = await task_service.create_langflow_upload_task(
@@ -414,7 +403,7 @@ async def _ingest_default_documents_langflow(
         owner_name=anonymous_user.name,
         owner_email=anonymous_user.email,
         session_id=None,  # No session for default documents
-        tweaks=default_tweaks,
+        runtime_vars=default_runtime_vars,
         settings=None,  # Use default ingestion settings
         delete_after_ingest=True,  # Clean up after ingestion
         replace_duplicates=True,

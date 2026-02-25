@@ -579,16 +579,17 @@ async def update_settings(
                 MessageId.ORB_SETTINGS_CHUNK_UPDATED
             )
 
-            # Also update the ingest flow with the new chunk size
+            # Persist runtime chunk size as Langflow global variable
             try:
-                flows_service = _get_flows_service()
-                await flows_service.update_ingest_flow_chunk_size(body.chunk_size)
+                await clients._create_langflow_global_variable(
+                    "CHUNK_SIZE", str(body.chunk_size), modify=True
+                )
                 logger.info(
-                    f"Successfully updated ingest flow chunk size to {body.chunk_size}"
+                    f"Successfully updated CHUNK_SIZE global variable to {body.chunk_size}"
                 )
             except Exception as e:
-                logger.error(f"Failed to update ingest flow chunk size: {str(e)}")
-                # Don't fail the entire settings update if flow update fails
+                logger.error(f"Failed to update CHUNK_SIZE global variable: {str(e)}")
+                # Don't fail the entire settings update if global variable update fails
                 # The config will still be saved
 
         if body.chunk_overlap is not None:
@@ -599,18 +600,17 @@ async def update_settings(
                 MessageId.ORB_SETTINGS_CHUNK_UPDATED
             )
 
-            # Also update the ingest flow with the new chunk overlap
+            # Persist runtime chunk overlap as Langflow global variable
             try:
-                flows_service = _get_flows_service()
-                await flows_service.update_ingest_flow_chunk_overlap(
-                    body.chunk_overlap
+                await clients._create_langflow_global_variable(
+                    "CHUNK_OVERLAP", str(body.chunk_overlap), modify=True
                 )
                 logger.info(
-                    f"Successfully updated ingest flow chunk overlap to {body.chunk_overlap}"
+                    f"Successfully updated CHUNK_OVERLAP global variable to {body.chunk_overlap}"
                 )
             except Exception as e:
-                logger.error(f"Failed to update ingest flow chunk overlap: {str(e)}")
-                # Don't fail the entire settings update if flow update fails
+                logger.error(f"Failed to update CHUNK_OVERLAP global variable: {str(e)}")
+                # Don't fail the entire settings update if global variable update fails
         if body.index_name is not None:
             old_index_name = current_config.knowledge.index_name
             new_index_name = body.index_name.strip()
@@ -1222,6 +1222,27 @@ async def _update_langflow_global_variables(config):
                 f"Set SELECTED_EMBEDDING_MODEL global variable to {config.knowledge.embedding_model}"
             )
 
+        if config.knowledge.chunk_size is not None:
+            await clients._create_langflow_global_variable(
+                "CHUNK_SIZE", str(config.knowledge.chunk_size), modify=True
+            )
+            logger.info(
+                f"Set CHUNK_SIZE global variable to {config.knowledge.chunk_size}"
+            )
+
+        if config.knowledge.chunk_overlap is not None:
+            await clients._create_langflow_global_variable(
+                "CHUNK_OVERLAP", str(config.knowledge.chunk_overlap), modify=True
+            )
+            logger.info(
+                f"Set CHUNK_OVERLAP global variable to {config.knowledge.chunk_overlap}"
+            )
+
+        await clients._create_langflow_global_variable(
+            "SEPARATOR", "\\n", modify=True
+        )
+        logger.info("Set SEPARATOR global variable to \\n")
+
     except Exception as e:
         logger.error(f"Failed to update Langflow global variables: {str(e)}")
         raise
@@ -1328,14 +1349,25 @@ async def _update_langflow_docling_settings(config, flows_service):
         raise
 
 
-async def _update_langflow_chunk_settings(config, flows_service):
-    """Update chunk size and overlap in ingest flow"""
+async def _update_langflow_chunk_settings(config):
+    """Update chunk settings as Langflow global variables."""
     try:
-        await flows_service.update_ingest_flow_chunk_size(config.knowledge.chunk_size)
-        logger.info(f"Successfully updated ingest flow chunk size to {config.knowledge.chunk_size}")
+        await clients._create_langflow_global_variable(
+            "CHUNK_SIZE", str(config.knowledge.chunk_size), modify=True
+        )
+        logger.info(
+            f"Successfully updated CHUNK_SIZE global variable to {config.knowledge.chunk_size}"
+        )
 
-        await flows_service.update_ingest_flow_chunk_overlap(config.knowledge.chunk_overlap)
-        logger.info(f"Successfully updated ingest flow chunk overlap to {config.knowledge.chunk_overlap}")
+        await clients._create_langflow_global_variable(
+            "CHUNK_OVERLAP", str(config.knowledge.chunk_overlap), modify=True
+        )
+        logger.info(
+            f"Successfully updated CHUNK_OVERLAP global variable to {config.knowledge.chunk_overlap}"
+        )
+
+        await clients._create_langflow_global_variable("SEPARATOR", "\\n", modify=True)
+        logger.info("Successfully updated SEPARATOR global variable to \\n")
     except Exception as e:
         logger.error(f"Failed to update chunk settings: {str(e)}")
         raise
@@ -1416,7 +1448,7 @@ async def reapply_all_settings(session_manager = None):
             logger.error(f"Failed to update Langflow docling settings: {str(e)}")
 
         try:
-            await _update_langflow_chunk_settings(config, flows_service)
+            await _update_langflow_chunk_settings(config)
         except Exception as e:
             logger.error(f"Failed to update Langflow chunk settings: {str(e)}")
 

@@ -25,7 +25,6 @@ class RunIngestionBody(BaseModel):
     file_ids: Optional[List[str]] = None
     file_metadata: Optional[List[dict]] = None
     session_id: Optional[str] = None
-    tweaks: Optional[dict] = None
     settings: Optional[dict] = None
 
 
@@ -87,25 +86,16 @@ async def run_ingestion(
             filename = os.path.basename(file_path)
             file_tuples.append((filename, b"", "application/octet-stream"))
 
-    tweaks = body.tweaks or {}
     settings = body.settings or {}
-
-    # Convert UI settings to component tweaks
-    if settings:
-        logger.debug("Applying ingestion settings", settings=settings)
-        if settings.get("chunkSize") or settings.get("chunkOverlap") or settings.get("separator"):
-            if "SplitText-PC36h" not in tweaks:
-                tweaks["SplitText-PC36h"] = {}
-            if settings.get("chunkSize"):
-                tweaks["SplitText-PC36h"]["chunk_size"] = settings["chunkSize"]
-            if settings.get("chunkOverlap"):
-                tweaks["SplitText-PC36h"]["chunk_overlap"] = settings["chunkOverlap"]
-            if settings.get("separator"):
-                tweaks["SplitText-PC36h"]["separator"] = settings["separator"]
-        if settings.get("embeddingModel"):
-            if "OpenAIEmbeddings-joRJ6" not in tweaks:
-                tweaks["OpenAIEmbeddings-joRJ6"] = {}
-            tweaks["OpenAIEmbeddings-joRJ6"]["model"] = settings["embeddingModel"]
+    runtime_vars = {}
+    if settings.get("chunkSize"):
+        runtime_vars["CHUNK_SIZE"] = settings["chunkSize"]
+    if settings.get("chunkOverlap"):
+        runtime_vars["CHUNK_OVERLAP"] = settings["chunkOverlap"]
+    if settings.get("separator"):
+        runtime_vars["SEPARATOR"] = settings["separator"]
+    if settings.get("embeddingModel"):
+        runtime_vars["SELECTED_EMBEDDING_MODEL"] = settings["embeddingModel"]
 
     jwt_token = user.jwt_token
 
@@ -119,7 +109,7 @@ async def run_ingestion(
             file_tuples=file_tuples,
             jwt_token=jwt_token,
             session_id=body.session_id,
-            tweaks=tweaks,
+            runtime_vars=runtime_vars,
             owner=user.user_id,
             owner_name=user.name,
             owner_email=user.email,
@@ -134,7 +124,6 @@ async def upload_and_ingest_user_file(
     file: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
     settings_json: Optional[str] = Form(None, alias="settings"),
-    tweaks_json: Optional[str] = Form(None, alias="tweaks"),
     delete_after_ingest: str = Form("true"),
     langflow_file_service=Depends(get_langflow_file_service),
     session_manager=Depends(get_session_manager),
@@ -144,19 +133,12 @@ async def upload_and_ingest_user_file(
     """Upload and ingest a file via Langflow (async background task)"""
     try:
         settings = None
-        tweaks = None
 
         if settings_json:
             try:
                 settings = json.loads(settings_json)
             except json.JSONDecodeError as e:
                 return JSONResponse({"error": f"Invalid settings JSON: {e}"}, status_code=400)
-
-        if tweaks_json:
-            try:
-                tweaks = json.loads(tweaks_json)
-            except json.JSONDecodeError as e:
-                return JSONResponse({"error": f"Invalid tweaks JSON: {e}"}, status_code=400)
 
         jwt_token = user.jwt_token
         content = await file.read()
@@ -178,7 +160,6 @@ async def upload_and_ingest_user_file(
                 owner_name=user.name,
                 owner_email=user.email,
                 session_id=session_id,
-                tweaks=tweaks,
                 settings=settings,
                 delete_after_ingest=delete_after_ingest.lower() == "true",
             )
