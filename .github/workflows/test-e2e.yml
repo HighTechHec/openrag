@@ -78,15 +78,9 @@ jobs:
           restore-keys: |
             playwright-${{ env.PLAYWRIGHT_VERSION }}-chromium-${{ runner.os }}
 
-      - name: Install Playwright Browser Dependencies
+      - name: Install Playwright Browsers
         working-directory: frontend
-        if: steps.cache-playwright.outputs.cache-hit != 'true' && inputs.runs-on != 'self-hosted'
-        run: |
-          npx playwright install --with-deps chromium
-
-      - name: Install Playwright Browsers (Self-Hosted)
-        working-directory: frontend
-        if: steps.cache-playwright.outputs.cache-hit != 'true' && inputs.runs-on == 'self-hosted'
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: |
           npx playwright install chromium
 
