@@ -9,7 +9,9 @@ E2E_ENV="frontend/.env.test"
 E2E_ENV_EXAMPLE="frontend/.env.test.example"
 
 # Create .env.test from the example template (never modify the tracked example file)
-cp "$E2E_ENV_EXAMPLE" "$E2E_ENV"
+if [ ! -f "$E2E_ENV" ]; then
+    cp "$E2E_ENV_EXAMPLE" "$E2E_ENV"
+fi
 
 # Auto-generate a strong OpenSearch password if not already set in the env file.
 # OpenSearch requires: uppercase, lowercase, digit, special char, min 8 chars.
