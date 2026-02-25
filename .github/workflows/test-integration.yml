@@ -76,6 +76,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Create .env from example
+        run: cp .env.example .env
+
       - name: Run integration tests
         env:
           OPENSEARCH_HOST: localhost
