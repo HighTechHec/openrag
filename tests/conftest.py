@@ -127,6 +127,24 @@ def test_documents_dir():
         yield test_dir
 
 
+ANTHROPIC_LLM_MODEL = "claude-3-5-haiku-latest"
+
+
+@pytest.fixture
+def anthropic_api_key():
+    """Return the ANTHROPIC_API_KEY from env, or skip the test if unset."""
+    key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not key:
+        pytest.skip("ANTHROPIC_API_KEY not set – skipping Anthropic integration test")
+    return key
+
+
+@pytest.fixture
+def anthropic_llm_model():
+    """Default Anthropic LLM model used in integration tests."""
+    return ANTHROPIC_LLM_MODEL
+
+
 @pytest.fixture
 def test_single_file():
     """Create a single test file."""
