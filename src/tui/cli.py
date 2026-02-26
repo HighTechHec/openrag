@@ -340,20 +340,18 @@ def _start_services_cli(
     container_manager: ContainerManager,
     docling_manager: DoclingManager,
 ):
-    """Start container services and docling via async bridge."""
+    """Start container services (including docling-serve) via async bridge."""
     console.print()
     console.print("Starting OpenRAG services...", style="bold")
 
     async def _inner():
-        # Start container services
+        # Start all container services (docling-serve is part of the compose stack)
         if container_manager.is_available():
             async for item in container_manager.start_services():
-                # start_services yields (success, message) or (success, message, replace_last)
                 success = item[0]
                 message = item[1]
                 replace_last = item[2] if len(item) > 2 else False
                 if replace_last:
-                    # Progress update — overwrite line
                     console.print(f"\r  {message}", end="")
                 else:
                     console.print(f"  {message}")
@@ -362,14 +360,6 @@ def _start_services_cli(
                     console.print(f"  [red]✗ {message}[/red]")
         else:
             console.print("  [yellow]No container runtime available[/yellow]")
-
-        # Start docling
-        if not docling_manager.is_running():
-            success, message = await docling_manager.start()
-            if success:
-                console.print(f"  {message}")
-            else:
-                console.print(f"  [yellow]{message}[/yellow]")
 
     try:
         asyncio.run(_inner())
@@ -382,19 +372,15 @@ def _stop_services_cli(
     container_manager: ContainerManager,
     docling_manager: DoclingManager,
 ):
-    """Stop container services and docling via async bridge."""
+    """Stop container services (including docling-serve) via async bridge."""
     console.print()
     console.print("Stopping OpenRAG services...", style="bold")
 
     async def _inner():
-        # Stop container services
+        # Stop all container services (docling-serve is part of the compose stack)
         if container_manager.is_available():
             async for success, message, *rest in container_manager.stop_services():
                 console.print(f"  {message}")
-        # Stop docling
-        if docling_manager.is_running():
-            success, message = await docling_manager.stop()
-            console.print(f"  {message}")
 
     try:
         asyncio.run(_inner())
