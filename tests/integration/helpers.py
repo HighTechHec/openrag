@@ -11,6 +11,8 @@ import sys
 
 import httpx
 
+from config.model_constants import OPENAI_DEFAULT_EMBEDDING_MODEL
+
 
 def dump_docker_logs(container_name_pattern: str = "langflow", tail: int = 100):
     """Dump Docker container logs for debugging."""
@@ -243,7 +245,7 @@ async def create_app_with_clean_index():
 def set_common_test_env(
     disable_langflow_ingest: bool = True,
     embedding_provider: str = "openai",
-    embedding_model: str = "text-embedding-3-small",
+    embedding_model: str = OPENAI_DEFAULT_EMBEDDING_MODEL,
     llm_provider: str | None = None,
     llm_model: str | None = None,
 ):

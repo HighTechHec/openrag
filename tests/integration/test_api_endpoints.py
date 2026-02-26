@@ -354,21 +354,21 @@ async def test_search_multi_embedding_models(
             resp = await client.post(
                 "/settings",
                 json={
-                    "embedding_model": "text-embedding-3-small",
-                    "llm_model": "gpt-4o-mini",
+                    "embedding_model": OPENAI_DEFAULT_EMBEDDING_MODEL,
+                    "llm_model": OPENAI_DEFAULT_LANGUAGE_MODEL,
                 },
             )
             assert resp.status_code == 200, resp.text
 
             # Ingest first document (small model)
             await _upload_doc("doc-small.md", "Physics basics and fundamental principles.")
-            payload_small = await _wait_for_models({"text-embedding-3-small"})
+            payload_small = await _wait_for_models({OPENAI_DEFAULT_EMBEDDING_MODEL})
             result_models_small = {
                 r.get("embedding_model")
                 for r in (payload_small.get("results") or [])
                 if r.get("embedding_model")
             }
-            assert "text-embedding-3-small" in result_models_small or not result_models_small
+            assert OPENAI_DEFAULT_EMBEDDING_MODEL in result_models_small or not result_models_small
 
             # Update embedding model via settings
             resp = await client.post(
@@ -380,17 +380,17 @@ async def test_search_multi_embedding_models(
             # Ingest second document which should use the large embedding model
             await _upload_doc("doc-large.md", "Advanced physics covers quantum topics extensively.")
 
-            payload = await _wait_for_models({"text-embedding-3-small", "text-embedding-3-large"})
+            payload = await _wait_for_models({OPENAI_DEFAULT_EMBEDDING_MODEL, "text-embedding-3-large"})
             buckets = payload.get("aggregations", {}).get("embedding_models", {}).get("buckets", [])
             models = {b.get("key") for b in buckets}
-            assert {"text-embedding-3-small", "text-embedding-3-large"} <= models
+            assert {OPENAI_DEFAULT_EMBEDDING_MODEL, "text-embedding-3-large"} <= models
 
             result_models = {
                 r.get("embedding_model")
                 for r in (payload.get("results") or [])
                 if r.get("embedding_model")
             }
-            assert {"text-embedding-3-small", "text-embedding-3-large"} <= result_models
+            assert {OPENAI_DEFAULT_EMBEDDING_MODEL, "text-embedding-3-large"} <= result_models
     finally:
         from config.settings import clients
 
