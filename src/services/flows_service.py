@@ -503,6 +503,19 @@ class FlowsService:
                             logger.warning(
                                 f"Failed to update {flow_type} flow with current configuration: {update_result.get('error', 'Unknown error')}"
                             )
+
+                        if flow_type in ["ingest", "url_ingest"]:
+                            try:
+                                from api.settings import get_docling_preset_configs
+                                preset_config = get_docling_preset_configs(
+                                    table_structure=config.knowledge.table_structure,
+                                    ocr=config.knowledge.ocr,
+                                    picture_descriptions=config.knowledge.picture_descriptions,
+                                )
+                                await self.update_flow_docling_preset("custom", preset_config)
+                                logger.info(f"Successfully reapplied docling settings to {flow_type} flow")
+                            except Exception as e:
+                                logger.error(f"Failed to reapply docling settings to {flow_type} flow: {str(e)}")
                     else:
                         logger.info(
                             f"Configuration not yet edited (onboarding not completed), skipping model updates for {flow_type} flow"
