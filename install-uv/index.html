@@ -11,7 +11,7 @@
 <script>!function(){function e(){if(void 0!==window.truste&&window.truste.cma){var e=window.truste.cma.callApi("getConsent",window.location.href)||{},n=1===e[2],t=1===e[3];gtag("consent","update",{ad_storage:n?"granted":"denied",ad_user_data:n?"granted":"denied",ad_personalization:n?"granted":"denied",analytics_storage:t?"granted":"denied"})}}window.addEventListener&&(window.addEventListener("cm_data_subject_consent_changed",e),window.addEventListener("cm_consent_preferences_set",e)),"complete"===document.readyState?e():window.addEventListener("load",e)}()</script>
 <script>window._ibmAnalytics={settings:{name:"DataStax",tealiumProfileName:"ibm-subsidiary"},trustarc:{privacyPolicyLink:"https://ibm.com/privacy"}},window.digitalData={page:{pageInfo:{ibm:{siteId:"IBM_DataStax"}},category:{primaryCategory:"PC230"}}}</script>
 <script src="//1.www.s81c.com/common/stats/ibm-common.js" async="true"></script><link rel="stylesheet" href="/assets/css/styles.29e42e49.css">
-<script src="/assets/js/runtime~main.4cfa6132.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.0d73362b.js" defer="defer"></script>
 <script src="/assets/js/main.9f175332.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -35,10 +35,10 @@ See <a class="" href="/install-windows">Install OpenRAG on Windows</a> before pr
 <ul>
 <li class="">
 <p>Install <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" class="">Podman</a> or <a href="https://docs.docker.com/get-docker/" target="_blank" rel="noopener noreferrer" class="">Docker</a>.</p>
-<p>The OpenRAG team recommends, at minimum, 8 GB of RAM for container VMs.
-However, if you plan to upload large files regularly, more RAM is recommended.
-For more information, see <a class="" href="/support/troubleshoot">Troubleshoot OpenRAG</a>.</p>
-<p>A Docker or Podman VM must be running before you start OpenRAG.</p>
+<p>A Docker or Podman VM must be running before you start OpenRAG unless you are running OpenRAG on a Linux-based VM, such as a Linux-based <a class="" href="/install-windows">WSL</a> image.</p>
+<p>The container VM must have sufficient resources to run the OpenRAG containers.
+The minimum recommendation is 8 GB of RAM and at least 50 GB of free disk space.</p>
+<p>For more information, see <a class="" href="/support/troubleshoot">Troubleshoot OpenRAG</a>.</p>
 </li>
 <li class="">
 <p>Install <a href="https://docs.podman.io/en/latest/markdown/podman-compose.1.html" target="_blank" rel="noopener noreferrer" class=""><code>podman-compose</code></a> or <a href="https://docs.docker.com/compose/install/" target="_blank" rel="noopener noreferrer" class="">Docker Compose</a>.
