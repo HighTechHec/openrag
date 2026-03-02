@@ -10,7 +10,7 @@ from fastapi import Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from utils.logging_config import get_logger
-from utils.opensearch_utils import OpenSearchDiskSpaceError
+from utils.opensearch_utils import OpenSearchDiskSpaceError, DISK_SPACE_ERROR_MESSAGE
 from dependencies import get_search_service, get_api_key_user_async
 from session_manager import User
 
@@ -68,7 +68,7 @@ async def search_endpoint(
 
     except OpenSearchDiskSpaceError as e:
         logger.error("Search blocked by disk space constraint", error=str(e), user_id=user.user_id)
-        return JSONResponse({"error": str(e)}, status_code=507)
+        return JSONResponse({"error": DISK_SPACE_ERROR_MESSAGE}, status_code=507)
     except Exception as e:
         error_msg = str(e)
         logger.error("Search failed", error=error_msg, user_id=user.user_id)
