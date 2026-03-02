@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { ModelProvider } from "../_helpers/model-helpers";
+import CardIcon from "./card-icon";
 
 export interface ModelProviderCardData {
     providerKey: ModelProvider;
@@ -40,11 +41,9 @@ export default function ModelProviderCard({
                 <div className="flex flex-col items-start justify-between">
                     <div className="flex flex-col gap-3">
                         <div className="mb-1">
-                            <div
-                                className={cn(
-                                    "w-8 h-8 rounded flex items-center justify-center border",
-                                    isConfigured ? logoBgColor : "bg-muted group-hover:bg-background",
-                                )}
+                            <CardIcon
+                                isActive={isConfigured}
+                                activeBgColor={logoBgColor}
                             >
                                 <Logo
                                     className={
@@ -53,7 +52,7 @@ export default function ModelProviderCard({
                                             : "text-muted-foreground"
                                     }
                                 />
-                            </div>
+                            </CardIcon>
                         </div>
                         <CardTitle className="flex flex-row items-center gap-2">
                             {name}
