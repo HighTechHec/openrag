@@ -51,9 +51,9 @@ export default function ConnectorCard({
                             <div
                                 className={cn(
                                     "w-8 h-8 rounded flex items-center justify-center border",
-                                    connector?.available
+                                    connector?.available && isConnected
                                         ? "bg-white"
-                                        : "bg-muted grayscale",
+                                        : "bg-muted grayscale group-hover:bg-background",
                                 )}
                             >
                                 {connector.icon}
