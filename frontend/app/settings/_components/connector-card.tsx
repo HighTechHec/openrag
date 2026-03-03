@@ -9,7 +9,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCcw, Settings2, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export interface Connector {
@@ -29,6 +29,8 @@ interface ConnectorCardProps {
     onConnect: (connector: Connector) => void;
     onDisconnect: (connector: Connector) => void;
     onNavigateToKnowledge: (connector: Connector) => void;
+    /** Optional: open a connector-specific settings/edit dialog */
+    onConfigure?: (connector: Connector) => void;
 }
 
 export default function ConnectorCard({
@@ -38,6 +40,7 @@ export default function ConnectorCard({
     onConnect,
     onDisconnect,
     onNavigateToKnowledge,
+    onConfigure,
 }: ConnectorCardProps) {
     console.log(connector)
     const isConnected = connector?.name === "Google Drive" || connector?.status === "connected" && connector?.connectionId;
@@ -93,19 +96,33 @@ export default function ConnectorCard({
                                     <Plus className="h-4 w-4" />
                                     <span className="text-mmd truncate">Add Knowledge</span>
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => onConnect(connector)}
-                                    disabled={isConnecting || isDisconnecting}
-                                    className="cursor-pointer"
-                                    size="iconMd"
-                                >
-                                    {isConnecting ? (
-                                        <RefreshCcw className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <RefreshCcw className="h-4 w-4" />
-                                    )}
-                                </Button>
+                                {onConfigure && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => onConfigure(connector)}
+                                        disabled={isConnecting || isDisconnecting}
+                                        className="cursor-pointer"
+                                        size="iconMd"
+                                        title="Edit configuration"
+                                    >
+                                        <Settings2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                {!onConfigure && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => onConnect(connector)}
+                                        disabled={isConnecting || isDisconnecting}
+                                        className="cursor-pointer"
+                                        size="iconMd"
+                                    >
+                                        {isConnecting ? (
+                                            <RefreshCcw className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <RefreshCcw className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                )}
                                 <Button
                                     variant="outline"
                                     onClick={() => onDisconnect(connector)}
@@ -122,7 +139,7 @@ export default function ConnectorCard({
                             </div>
                         ) : (
                             <Button
-                                onClick={() => onConnect(connector)}
+                                onClick={() => onConfigure ? onConfigure(connector) : onConnect(connector)}
                                 disabled={isConnecting}
                                 className="w-full cursor-pointer group-hover:bg-background group-hover:border-zinc-700 group-hover:text-primary"
                                 size="sm"
@@ -138,6 +155,17 @@ export default function ConnectorCard({
                             </Button>
                         )}
                     </div>
+                ) : onConfigure ? (
+                    // Connector supports UI-based configuration (e.g. IBM COS)
+                    <Button
+                        variant="outline"
+                        onClick={() => onConfigure(connector)}
+                        className="w-full cursor-pointer"
+                        size="sm"
+                    >
+                        <Settings2 className="h-4 w-4 mr-2" />
+                        Configure
+                    </Button>
                 ) : (
                     <div className="text-sm text-muted-foreground">
                         <p>

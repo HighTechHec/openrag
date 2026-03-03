@@ -1,4 +1,3 @@
-import os
 import uuid
 import json
 import httpx
@@ -19,7 +18,6 @@ from connectors.sharepoint.oauth import SharePointOAuth
 from connectors.google_drive import GoogleDriveConnector
 from connectors.onedrive import OneDriveConnector
 from connectors.sharepoint import SharePointConnector
-from connectors.ibm_cos import IBMCOSConnector
 
 # Connectors that authenticate directly (no OAuth redirect required)
 _DIRECT_AUTH_CONNECTORS = {"ibm_cos"}
@@ -478,7 +476,7 @@ class AuthService:
                     else:
                         logger.warning("_handle_data_source_auth: _detect_base_url returned None")
                 else:
-                    logger.warning(f"_handle_data_source_auth: Connector not available or doesn't have _detect_base_url")
+                    logger.warning("_handle_data_source_auth: Connector not available or doesn't have _detect_base_url")
                 
                 # Clear the cached connector so next get_connector() creates a fresh instance
                 # with the updated config (including base_url)

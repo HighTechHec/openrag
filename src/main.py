@@ -762,6 +762,10 @@ async def create_app():
 
     # Connector endpoints
     app.add_api_route("/connectors", connectors.list_connectors, methods=["GET"], tags=["internal"])
+    # IBM COS-specific routes (registered before generic /{connector_type}/... to avoid shadowing)
+    app.add_api_route("/connectors/ibm_cos/defaults", connectors.ibm_cos_defaults, methods=["GET"], tags=["internal"])
+    app.add_api_route("/connectors/ibm_cos/configure", connectors.ibm_cos_configure, methods=["POST"], tags=["internal"])
+    app.add_api_route("/connectors/ibm_cos/{connection_id}/buckets", connectors.ibm_cos_list_buckets, methods=["GET"], tags=["internal"])
     app.add_api_route("/connectors/{connector_type}/sync", connectors.connector_sync, methods=["POST"], tags=["internal"])
     app.add_api_route("/connectors/sync-all", connectors.sync_all_connectors, methods=["POST"], tags=["internal"])
     app.add_api_route("/connectors/{connector_type}/status", connectors.connector_status, methods=["GET"], tags=["internal"])

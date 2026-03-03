@@ -602,6 +602,194 @@ async def connector_disconnect(
         )
 
 
+# ---------------------------------------------------------------------------
+# IBM COS-specific endpoints
+# ---------------------------------------------------------------------------
+
+class IBMCOSConfigureBody(BaseModel):
+    auth_mode: str  # "iam" or "hmac"
+    endpoint: str
+    # IAM fields
+    api_key: Optional[str] = None
+    service_instance_id: Optional[str] = None
+    auth_endpoint: Optional[str] = None
+    # HMAC fields
+    hmac_access_key: Optional[str] = None
+    hmac_secret_key: Optional[str] = None
+    # Optional bucket selection
+    bucket_names: Optional[List[str]] = None
+    # Optional: update an existing connection
+    connection_id: Optional[str] = None
+
+
+async def ibm_cos_defaults(
+    connector_service=Depends(get_connector_service),
+    user: User = Depends(get_current_user),
+):
+    """Return current IBM COS env-var defaults for pre-filling the config dialog.
+
+    Sensitive values (API key, HMAC secret) are masked — only whether they are
+    set is returned, not the actual values.
+    """
+    import os
+
+    api_key = os.getenv("IBM_COS_API_KEY", "")
+    service_instance_id = os.getenv("IBM_COS_SERVICE_INSTANCE_ID", "")
+    endpoint = os.getenv("IBM_COS_ENDPOINT", "")
+    hmac_access_key = os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID", "")
+    hmac_secret_key = os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY", "")
+
+    # Try to read existing connection config for this user too
+    connections = await connector_service.connection_manager.list_connections(
+        user_id=user.user_id, connector_type="ibm_cos"
+    )
+    conn_config = {}
+    if connections:
+        conn_config = connections[0].config or {}
+
+    def _pick(conn_key, env_val):
+        """Prefer connection config value over env var."""
+        return conn_config.get(conn_key) or env_val
+
+    return JSONResponse({
+        "api_key_set": bool(api_key or conn_config.get("api_key")),
+        "service_instance_id": _pick("service_instance_id", service_instance_id),
+        "endpoint": _pick("endpoint_url", endpoint),
+        "hmac_access_key_set": bool(hmac_access_key or conn_config.get("hmac_access_key")),
+        "hmac_secret_key_set": bool(hmac_secret_key or conn_config.get("hmac_secret_key")),
+        # Return which auth mode was previously used
+        "auth_mode": conn_config.get("auth_mode", "iam" if (api_key or conn_config.get("api_key")) else "hmac"),
+        # Return bucket_names from existing connection (if any)
+        "bucket_names": conn_config.get("bucket_names", []),
+        # Return connection_id if an existing connection exists
+        "connection_id": connections[0].connection_id if connections else None,
+    })
+
+
+async def ibm_cos_configure(
+    body: IBMCOSConfigureBody,
+    connector_service=Depends(get_connector_service),
+    user: User = Depends(get_current_user),
+):
+    """Create or update an IBM COS connection with explicit credentials.
+
+    Tests the credentials by listing buckets, then persists the connection.
+    Credentials are stored in the connection config dict (not env vars) so
+    the connector works even without system-level env vars.
+    """
+    import os
+    from connectors.ibm_cos.auth import create_ibm_cos_client
+
+    # Build the config dict that will be stored in the connection
+    conn_config: dict = {
+        "auth_mode": body.auth_mode,
+        "endpoint_url": body.endpoint,
+    }
+
+    if body.auth_mode == "iam":
+        # Resolve: use supplied value, fall back to env var, fall back to existing connection
+        api_key = body.api_key or os.getenv("IBM_COS_API_KEY")
+        svc_id = body.service_instance_id or os.getenv("IBM_COS_SERVICE_INSTANCE_ID")
+
+        # If still empty, pull from existing connection config
+        existing_connections = await connector_service.connection_manager.list_connections(
+            user_id=user.user_id, connector_type="ibm_cos"
+        )
+        if not api_key and existing_connections:
+            api_key = existing_connections[0].config.get("api_key")
+        if not svc_id and existing_connections:
+            svc_id = existing_connections[0].config.get("service_instance_id")
+
+        if not api_key or not svc_id:
+            return JSONResponse(
+                {"error": "IAM mode requires api_key and service_instance_id"},
+                status_code=400,
+            )
+        conn_config["api_key"] = api_key
+        conn_config["service_instance_id"] = svc_id
+        if body.auth_endpoint:
+            conn_config["auth_endpoint"] = body.auth_endpoint
+    else:
+        # HMAC mode
+        hmac_access = body.hmac_access_key or os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID")
+        hmac_secret = body.hmac_secret_key or os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY")
+
+        existing_connections = await connector_service.connection_manager.list_connections(
+            user_id=user.user_id, connector_type="ibm_cos"
+        )
+        if not hmac_access and existing_connections:
+            hmac_access = existing_connections[0].config.get("hmac_access_key")
+        if not hmac_secret and existing_connections:
+            hmac_secret = existing_connections[0].config.get("hmac_secret_key")
+
+        if not hmac_access or not hmac_secret:
+            return JSONResponse(
+                {"error": "HMAC mode requires hmac_access_key and hmac_secret_key"},
+                status_code=400,
+            )
+        conn_config["hmac_access_key"] = hmac_access
+        conn_config["hmac_secret_key"] = hmac_secret
+
+    if body.bucket_names is not None:
+        conn_config["bucket_names"] = body.bucket_names
+
+    # Test credentials by creating a client and listing buckets
+    try:
+        client = create_ibm_cos_client(conn_config)
+        client.list_buckets()
+    except Exception as exc:
+        return JSONResponse(
+            {"error": f"Could not connect to IBM COS: {exc}"},
+            status_code=400,
+        )
+
+    # Persist: update existing connection or create a new one
+    if body.connection_id:
+        existing = await connector_service.connection_manager.get_connection(body.connection_id)
+        if existing and existing.user_id == user.user_id:
+            await connector_service.connection_manager.update_connection(
+                connection_id=body.connection_id,
+                config=conn_config,
+            )
+            # Evict cached connector so next call gets a fresh instance
+            connector_service.connection_manager.active_connectors.pop(body.connection_id, None)
+            return JSONResponse({"connection_id": body.connection_id, "status": "connected"})
+
+    # Create a fresh connection
+    connection_id = await connector_service.connection_manager.create_connection(
+        connector_type="ibm_cos",
+        name="IBM Cloud Object Storage",
+        config=conn_config,
+        user_id=user.user_id,
+    )
+    return JSONResponse({"connection_id": connection_id, "status": "connected"})
+
+
+async def ibm_cos_list_buckets(
+    connection_id: str,
+    connector_service=Depends(get_connector_service),
+    user: User = Depends(get_current_user),
+):
+    """List all buckets accessible with the stored IBM COS credentials."""
+    from connectors.ibm_cos.auth import create_ibm_cos_client
+
+    connection = await connector_service.connection_manager.get_connection(connection_id)
+    if not connection or connection.user_id != user.user_id:
+        return JSONResponse({"error": "Connection not found"}, status_code=404)
+    if connection.connector_type != "ibm_cos":
+        return JSONResponse({"error": "Not an IBM COS connection"}, status_code=400)
+
+    try:
+        client = create_ibm_cos_client(connection.config)
+        response = client.list_buckets()
+        buckets = [b["Name"] for b in response.get("Buckets", [])]
+        return JSONResponse({"buckets": buckets})
+    except Exception as exc:
+        return JSONResponse({"error": f"Failed to list buckets: {exc}"}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+
 async def sync_all_connectors(
     connector_service=Depends(get_connector_service),
     session_manager=Depends(get_session_manager),
