@@ -62,4 +62,5 @@ jobs:
       - uses: bcoe/conventional-release-labels@b503ca473654e07521c051628c5f1f969e7436da # v1
         with:
           type_labels: '{"feat": "enhancement","fix": "bug","docs": "documentation","style": "style","refactor": "refactor","perf": "performance","test": "test","chore": "chore","build": "build"}'
+          breaking_change_label: 'breaking'
 
