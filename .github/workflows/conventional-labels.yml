@@ -58,9 +58,10 @@ jobs:
     name: Label PR
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request_target' && github.event.pull_request.user.type != 'Bot'
+    permissions:
+      pull-requests: write
     steps:
       - uses: bcoe/conventional-release-labels@b503ca473654e07521c051628c5f1f969e7436da # v1
         with:
-          type_labels: '{"feat": "enhancement","fix": "bug","docs": "documentation","style": "style","refactor": "refactor","perf": "performance","test": "test","chore": "chore","build": "build"}'
-          breaking_change_label: 'breaking'
+          type_labels: '{"feat": "enhancement","fix": "bug","docs": "documentation","style": "style","refactor": "refactor","perf": "performance","test": "test","chore": "chore","build": "build","breaking": "breaking"}'
 
