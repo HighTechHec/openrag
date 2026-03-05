@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from connectors.base import BaseConnector, ConnectorDocument, DocumentACL
 from utils.logging_config import get_logger
 
-from .auth import create_ibm_cos_client
+from .auth import create_ibm_cos_resource
 
 logger = get_logger(__name__)
 
@@ -93,10 +93,10 @@ class IBMCOSConnector(BaseConnector):
 
         self._client = None  # Lazy-initialised in authenticate()
 
-    def _get_client(self):
-        """Return (and cache) the IBM COS boto3-compatible client."""
+    def _get_resource(self):
+        """Return (and cache) the IBM COS boto3-compatible resource."""
         if self._client is None:
-            self._client = create_ibm_cos_client(self.config)
+            self._client = create_ibm_cos_resource(self.config)
         return self._client
 
     # ------------------------------------------------------------------
@@ -106,8 +106,9 @@ class IBMCOSConnector(BaseConnector):
     async def authenticate(self) -> bool:
         """Validate credentials by listing buckets on the COS service."""
         try:
-            client = self._get_client()
-            client.list_buckets()
+            cos = self._get_resource()
+            # Iterating buckets triggers an authenticated API call
+            list(cos.buckets.all())
             self._authenticated = True
             logger.debug(f"IBM COS authenticated for connection {self.connection_id}")
             return True
@@ -121,9 +122,8 @@ class IBMCOSConnector(BaseConnector):
         if self.bucket_names:
             return self.bucket_names
         try:
-            client = self._get_client()
-            response = client.list_buckets()
-            buckets = [b["Name"] for b in response.get("Buckets", [])]
+            cos = self._get_resource()
+            buckets = [b.name for b in cos.buckets.all()]
             logger.debug(f"IBM COS auto-discovered {len(buckets)} bucket(s): {buckets}")
             return buckets
         except Exception as exc:
@@ -138,91 +138,58 @@ class IBMCOSConnector(BaseConnector):
     ) -> Dict[str, Any]:
         """List objects across all configured (or auto-discovered) buckets.
 
-        If no bucket_names are configured, all buckets accessible with the
-        current credentials are used automatically.
+        Uses the ibm_boto3 resource API: Bucket.objects.all() handles pagination
+        internally so all objects are returned without manual continuation tokens.
+
+        If no bucket_names are configured, all accessible buckets are used.
 
         Returns:
             dict with keys:
                 "files": list of file dicts (id, name, bucket, size, modified_time)
-                "next_page_token": continuation token or None
+                "next_page_token": always None (SDK handles pagination internally)
         """
-        client = self._get_client()
+        cos = self._get_resource()
         files: List[Dict[str, Any]] = []
-
         bucket_names = self._resolve_bucket_names()
 
-        # Page token format: "<bucket_index>:<s3_continuation_token>"
-        start_bucket_index = 0
-        s3_continuation_token: Optional[str] = None
-
-        if page_token:
+        for bucket_name in bucket_names:
             try:
-                idx_str, cos_token = page_token.split(":", 1)
-                start_bucket_index = int(idx_str)
-                s3_continuation_token = cos_token or None
-            except (ValueError, AttributeError):
-                logger.warning(f"Ignoring invalid page_token: {page_token!r}")
-
-        next_page_token: Optional[str] = None
-
-        for bucket_index, bucket in enumerate(bucket_names):
-            if bucket_index < start_bucket_index:
-                continue
-
-            # Reset S3 token when we move to a new bucket
-            if bucket_index > start_bucket_index:
-                s3_continuation_token = None
-
-            list_kwargs: Dict[str, Any] = {"Bucket": bucket}
-            if self.prefix:
-                list_kwargs["Prefix"] = self.prefix
-            if s3_continuation_token:
-                list_kwargs["ContinuationToken"] = s3_continuation_token
-
-            try:
-                while True:
-                    response = client.list_objects_v2(**list_kwargs)
-                    for obj in response.get("Contents", []):
-                        key = obj["Key"]
-                        # Skip "directory" placeholder keys
-                        if key.endswith("/"):
-                            continue
-                        files.append(
-                            {
-                                "id": _make_file_id(bucket, key),
-                                "name": basename(key) or key,
-                                "bucket": bucket,
-                                "key": key,
-                                "size": obj.get("Size", 0),
-                                "modified_time": obj.get("LastModified", "").isoformat()
-                                if obj.get("LastModified")
-                                else None,
-                            }
-                        )
-
-                        if max_files and len(files) >= max_files:
-                            # Emit a page token pointing at the current position
-                            if response.get("IsTruncated"):
-                                next_page_token = (
-                                    f"{bucket_index}:{response['NextContinuationToken']}"
-                                )
-                            return {"files": files, "next_page_token": next_page_token}
-
-                    if response.get("IsTruncated"):
-                        list_kwargs["ContinuationToken"] = response[
-                            "NextContinuationToken"
-                        ]
-                    else:
-                        break
+                bucket = cos.Bucket(bucket_name)
+                objects = (
+                    bucket.objects.filter(Prefix=self.prefix)
+                    if self.prefix
+                    else bucket.objects.all()
+                )
+                for obj in objects:
+                    # Skip "directory" placeholder keys (keys ending with /)
+                    if obj.key.endswith("/"):
+                        continue
+                    files.append(
+                        {
+                            "id": _make_file_id(bucket_name, obj.key),
+                            "name": basename(obj.key) or obj.key,
+                            "bucket": bucket_name,
+                            "key": obj.key,
+                            "size": obj.size,
+                            "modified_time": obj.last_modified.isoformat()
+                            if obj.last_modified
+                            else None,
+                        }
+                    )
+                    if max_files and len(files) >= max_files:
+                        return {"files": files, "next_page_token": None}
 
             except Exception as exc:
-                logger.error(f"Failed to list objects in bucket {bucket!r}: {exc}")
+                logger.error(f"Failed to list objects in bucket {bucket_name!r}: {exc}")
                 continue
 
-        return {"files": files, "next_page_token": next_page_token}
+        return {"files": files, "next_page_token": None}
 
     async def get_file_content(self, file_id: str) -> ConnectorDocument:
         """Download an object from IBM COS and return a ConnectorDocument.
+
+        Uses the ibm_boto3 resource API: Object.get() downloads content and
+        returns all metadata (ContentType, ContentLength, LastModified) in one call.
 
         Args:
             file_id: Composite ID in the form "<bucket>::<key>".
@@ -230,40 +197,41 @@ class IBMCOSConnector(BaseConnector):
         Returns:
             ConnectorDocument with content bytes, ACL, and metadata.
         """
-        bucket, key = _split_file_id(file_id)
-        client = self._get_client()
+        bucket_name, key = _split_file_id(file_id)
+        cos = self._get_resource()
 
-        # Download object
-        response = client.get_object(Bucket=bucket, Key=key)
+        # Object.get() returns the full response including Body stream and metadata
+        response = cos.Object(bucket_name, key).get()
         content: bytes = response["Body"].read()
 
-        # Object metadata
-        head = client.head_object(Bucket=bucket, Key=key)
-        last_modified: datetime = head.get("LastModified") or datetime.now(timezone.utc)
-        size: int = head.get("ContentLength", len(content))
+        last_modified: datetime = response.get("LastModified") or datetime.now(timezone.utc)
+        size: int = response.get("ContentLength", len(content))
 
-        # MIME type detection: content-type header → filename extension fallback
-        mime_type: str = (
-            head.get("ContentType")
-            or mimetypes.guess_type(key)[0]
-            or "application/octet-stream"
-        )
+        # MIME type detection: prefer filename extension over generic S3 content-type.
+        # IBM COS often stores "application/octet-stream" for all objects regardless
+        # of their real type, so we treat that as "unknown" and fall back to the
+        # extension-based guess which is more reliable for named files.
+        raw_content_type = response.get("ContentType", "")
+        if raw_content_type and raw_content_type != "application/octet-stream":
+            mime_type: str = raw_content_type
+        else:
+            mime_type = mimetypes.guess_type(key)[0] or "application/octet-stream"
 
         filename = basename(key) or key
 
-        acl = await self._extract_acl(bucket, key)
+        acl = await self._extract_acl(bucket_name, key)
 
         return ConnectorDocument(
             id=file_id,
             filename=filename,
             mimetype=mime_type,
             content=content,
-            source_url=f"cos://{bucket}/{key}",
+            source_url=f"cos://{bucket_name}/{key}",
             acl=acl,
             modified_time=last_modified,
             created_time=last_modified,  # IBM COS does not expose creation time
             metadata={
-                "ibm_cos_bucket": bucket,
+                "ibm_cos_bucket": bucket_name,
                 "ibm_cos_key": key,
                 "size": size,
             },
@@ -275,8 +243,9 @@ class IBMCOSConnector(BaseConnector):
         Falls back to a minimal ACL (owner = service instance ID) on failure.
         """
         try:
-            client = self._get_client()
-            acl_response = client.get_object_acl(Bucket=bucket, Key=key)
+            # The resource API exposes the underlying low-level client via meta.client
+            cos = self._get_resource()
+            acl_response = cos.meta.client.get_object_acl(Bucket=bucket, Key=key)
 
             owner_id: str = (
                 acl_response.get("Owner", {}).get("DisplayName")

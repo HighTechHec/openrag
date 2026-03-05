@@ -3,6 +3,7 @@
 import { AlertCircle, ArrowLeft, CheckCircle2, Circle, RefreshCw } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useSyncConnector } from "@/app/api/mutations/useSyncConnector";
 import { useGetConnectorsQuery } from "@/app/api/queries/useGetConnectorsQuery";
 import { useGetConnectorTokenQuery } from "@/app/api/queries/useGetConnectorTokenQuery";
@@ -56,8 +57,15 @@ function IBMCOSBucketView({
       },
       {
         onSuccess: (result) => {
-          if (result.task_ids?.length) addTask(result.task_ids[0]);
-          onDone();
+          if (result.task_ids?.length) {
+            addTask(result.task_ids[0]);
+            onDone();
+          } else {
+            toast.info("No files found in any bucket.");
+          }
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : "Sync failed");
         },
       },
     );
@@ -77,10 +85,17 @@ function IBMCOSBucketView({
       {
         onSuccess: (result) => {
           setSyncingBucket(null);
-          if (result.task_ids?.length) addTask(result.task_ids[0]);
-          onDone();
+          if (result.task_ids?.length) {
+            addTask(result.task_ids[0]);
+            onDone();
+          } else {
+            toast.info(`No files found in bucket "${bucketName}".`);
+          }
         },
-        onError: () => setSyncingBucket(null),
+        onError: (err) => {
+          setSyncingBucket(null);
+          toast.error(err instanceof Error ? err.message : "Sync failed");
+        },
       },
     );
   };

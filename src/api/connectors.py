@@ -728,7 +728,7 @@ async def ibm_cos_configure(
     the connector works even without system-level env vars.
     """
     import os
-    from connectors.ibm_cos.auth import create_ibm_cos_client
+    from connectors.ibm_cos.auth import create_ibm_cos_resource
 
     # Build the config dict that will be stored in the connection
     conn_config: dict = {
@@ -783,10 +783,10 @@ async def ibm_cos_configure(
     if body.bucket_names is not None:
         conn_config["bucket_names"] = body.bucket_names
 
-    # Test credentials by creating a client and listing buckets
+    # Test credentials by creating a resource and listing buckets
     try:
-        client = create_ibm_cos_client(conn_config)
-        client.list_buckets()
+        cos = create_ibm_cos_resource(conn_config)
+        list(cos.buckets.all())
     except Exception as exc:
         return JSONResponse(
             {"error": f"Could not connect to IBM COS: {exc}"},
@@ -821,7 +821,7 @@ async def ibm_cos_list_buckets(
     user: User = Depends(get_current_user),
 ):
     """List all buckets accessible with the stored IBM COS credentials."""
-    from connectors.ibm_cos.auth import create_ibm_cos_client
+    from connectors.ibm_cos.auth import create_ibm_cos_resource
 
     connection = await connector_service.connection_manager.get_connection(connection_id)
     if not connection or connection.user_id != user.user_id:
@@ -830,9 +830,8 @@ async def ibm_cos_list_buckets(
         return JSONResponse({"error": "Not an IBM COS connection"}, status_code=400)
 
     try:
-        client = create_ibm_cos_client(connection.config)
-        response = client.list_buckets()
-        buckets = [b["Name"] for b in response.get("Buckets", [])]
+        cos = create_ibm_cos_resource(connection.config)
+        buckets = [b.name for b in cos.buckets.all()]
         return JSONResponse({"buckets": buckets})
     except Exception as exc:
         return JSONResponse({"error": f"Failed to list buckets: {exc}"}, status_code=500)
@@ -849,7 +848,7 @@ async def ibm_cos_bucket_status(
     Each entry includes the bucket name, whether it has been ingested (is_synced),
     and the count of indexed documents from that bucket.
     """
-    from connectors.ibm_cos.auth import create_ibm_cos_client
+    from connectors.ibm_cos.auth import create_ibm_cos_resource
 
     connection = await connector_service.connection_manager.get_connection(connection_id)
     if not connection or connection.user_id != user.user_id:
@@ -859,9 +858,8 @@ async def ibm_cos_bucket_status(
 
     # 1. List all buckets from COS
     try:
-        client = create_ibm_cos_client(connection.config)
-        resp = client.list_buckets()
-        all_buckets = [b["Name"] for b in resp.get("Buckets", [])]
+        cos = create_ibm_cos_resource(connection.config)
+        all_buckets = [b.name for b in cos.buckets.all()]
     except Exception as exc:
         return JSONResponse({"error": f"Failed to list buckets: {exc}"}, status_code=500)
 
