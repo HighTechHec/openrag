@@ -688,6 +688,7 @@ async def ibm_cos_defaults(
     endpoint = os.getenv("IBM_COS_ENDPOINT", "")
     hmac_access_key = os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID", "")
     hmac_secret_key = os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY", "")
+    disable_iam = os.getenv("OPENRAG_IBM_COS_IAM_UI", "").lower() not in ("1", "true", "yes")
 
     # Try to read existing connection config for this user too
     connections = await connector_service.connection_manager.list_connections(
@@ -707,8 +708,9 @@ async def ibm_cos_defaults(
         "endpoint": _pick("endpoint_url", endpoint),
         "hmac_access_key_set": bool(hmac_access_key or conn_config.get("hmac_access_key")),
         "hmac_secret_key_set": bool(hmac_secret_key or conn_config.get("hmac_secret_key")),
-        # Return which auth mode was previously used
-        "auth_mode": conn_config.get("auth_mode", "iam" if (api_key or conn_config.get("api_key")) else "hmac"),
+        # Return which auth mode was previously used; default to hmac when IAM is disabled
+        "auth_mode": conn_config.get("auth_mode", "hmac" if (disable_iam or not (api_key or conn_config.get("api_key"))) else "iam"),
+        "disable_iam": disable_iam,
         # Return bucket_names from existing connection (if any)
         "bucket_names": conn_config.get("bucket_names", []),
         # Return connection_id if an existing connection exists

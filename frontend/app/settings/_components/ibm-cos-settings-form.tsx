@@ -31,6 +31,8 @@ interface IBMCOSSettingsFormProps {
     hmacAccessKeySet?: boolean;
     hmacSecretKeySet?: boolean;
     formError?: string | null;
+    /** When true, IAM tab is greyed out and HMAC is the only selectable option */
+    disableIam?: boolean;
 }
 
 export function IBMCOSSettingsForm({
@@ -44,6 +46,7 @@ export function IBMCOSSettingsForm({
     hmacAccessKeySet,
     hmacSecretKeySet,
     formError,
+    disableIam = false,
 }: IBMCOSSettingsFormProps) {
     const {
         register,
@@ -72,63 +75,34 @@ export function IBMCOSSettingsForm({
                     control={control}
                     name="auth_mode"
                     render={({ field }) => (
-                        <Tabs value={field.value} onValueChange={field.onChange}>
+                        <Tabs
+                            value={disableIam && field.value === "iam" ? "hmac" : field.value}
+                            onValueChange={(v) => {
+                                if (disableIam && v === "iam") return;
+                                field.onChange(v);
+                            }}
+                        >
                             <TabsList className="w-full">
-                                <TabsTrigger value="iam">
-                                    <span className="font-semibold text-sm">IAM</span>
-                                    <span className="text-xs text-muted-foreground font-normal">
-                                        API Key + Service Instance ID
-                                    </span>
-                                </TabsTrigger>
                                 <TabsTrigger value="hmac">
                                     <span className="font-semibold text-sm">HMAC</span>
                                     <span className="text-xs text-muted-foreground font-normal">
                                         Access Key + Secret Key
                                     </span>
                                 </TabsTrigger>
+                                <TabsTrigger
+                                    value="iam"
+                                    disabled={disableIam}
+                                    className={disableIam ? "opacity-40 cursor-not-allowed" : ""}
+                                    title={disableIam ? "IAM mode is disabled. Set OPENRAG_IBM_COS_IAM_UI=true to enable." : undefined}
+                                >
+                                    <span className="font-semibold text-sm">IAM</span>
+                                    <span className="text-xs text-muted-foreground font-normal">
+                                        API Key + Resource Instance ID
+                                    </span>
+                                </TabsTrigger>
                             </TabsList>
 
-                            {/* IAM fields */}
-                            <TabsContent value="iam">
-                                <div className="space-y-4">
-                                    <div className="space-y-1">
-                                        <LabelWrapper
-                                            label="API Key"
-                                            helperText={'Copy the "apikey" field from your IBM COS Service Credentials JSON'}
-                                            id="ibm-cos-api-key"
-                                            required
-                                        >
-                                            <Input
-                                                {...register("api_key", { setValueAs: (v) => v?.trim() })}
-                                                id="ibm-cos-api-key"
-                                                type="password"
-                                                placeholder={
-                                                    apiKeySet
-                                                        ? "•••••••• (loaded from env)"
-                                                        : 'apikey value from Service Credentials'
-                                                }
-                                                autoComplete="off"
-                                            />
-                                        </LabelWrapper>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <LabelWrapper
-                                            label="Resource Instance ID"
-                                            helperText={'Copy the "resource_instance_id" field from your IBM COS Service Credentials JSON'}
-                                            id="ibm-cos-svc-id"
-                                            required
-                                        >
-                                            <Input
-                                                {...register("service_instance_id", { setValueAs: (v) => v?.trim() })}
-                                                id="ibm-cos-svc-id"
-                                                placeholder="crn:v1:bluemix:public:cloud-object-storage:..."
-                                            />
-                                        </LabelWrapper>
-                                    </div>
-                                </div>
-                            </TabsContent>
-
-                            {/* HMAC fields */}
+                            {/* HMAC fields — first tab */}
                             <TabsContent value="hmac">
                                 <div className="space-y-4">
                                     <div className="space-y-1">
@@ -168,6 +142,46 @@ export function IBMCOSSettingsForm({
                                                         : "cos_hmac_keys.secret_access_key"
                                                 }
                                                 autoComplete="off"
+                                            />
+                                        </LabelWrapper>
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* IAM fields — second tab */}
+                            <TabsContent value="iam">
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <LabelWrapper
+                                            label="API Key"
+                                            helperText={'Copy the "apikey" field from your IBM COS Service Credentials JSON'}
+                                            id="ibm-cos-api-key"
+                                            required
+                                        >
+                                            <Input
+                                                {...register("api_key", { setValueAs: (v) => v?.trim() })}
+                                                id="ibm-cos-api-key"
+                                                type="password"
+                                                placeholder={
+                                                    apiKeySet
+                                                        ? "•••••••• (loaded from env)"
+                                                        : 'apikey value from Service Credentials'
+                                                }
+                                                autoComplete="off"
+                                            />
+                                        </LabelWrapper>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <LabelWrapper
+                                            label="Resource Instance ID"
+                                            helperText={'Copy the "resource_instance_id" field from your IBM COS Service Credentials JSON'}
+                                            id="ibm-cos-svc-id"
+                                            required
+                                        >
+                                            <Input
+                                                {...register("service_instance_id", { setValueAs: (v) => v?.trim() })}
+                                                id="ibm-cos-svc-id"
+                                                placeholder="crn:v1:bluemix:public:cloud-object-storage:..."
                                             />
                                         </LabelWrapper>
                                     </div>

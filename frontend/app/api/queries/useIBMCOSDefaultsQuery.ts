@@ -9,6 +9,7 @@ export interface IBMCOSDefaults {
     auth_mode: "iam" | "hmac";
     bucket_names: string[];
     connection_id: string | null;
+    disable_iam: boolean;
 }
 
 async function fetchIBMCOSDefaults(): Promise<IBMCOSDefaults> {

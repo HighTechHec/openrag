@@ -42,6 +42,7 @@ import {
 } from "../../components/delete-confirmation-dialog";
 import GoogleDriveIcon from "../../components/icons/google-drive-logo";
 import IBMLogo from "../../components/icons/ibm-logo";
+import IBMCOSIcon from "../../components/icons/ibm-cos-icon";
 import OneDriveIcon from "../../components/icons/one-drive-logo";
 import SharePointIcon from "../../components/icons/share-point-logo";
 import { useDeleteDocument } from "../api/mutations/useDeleteDocument";
@@ -65,7 +66,7 @@ function getSourceIcon(connectorType?: string) {
     case "s3":
       return <Cloud className="h-4 w-4 text-foreground flex-shrink-0" />;
     case "ibm_cos":
-      return <IBMLogo className="h-4 w-4 text-foreground flex-shrink-0" />;
+      return <IBMCOSIcon className="h-4 w-4 flex-shrink-0" />;
     default:
       return (
         <FileIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />

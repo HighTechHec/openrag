@@ -9,7 +9,7 @@ import {
   useGetConnectorsQuery,
 } from "@/app/api/queries/useGetConnectorsQuery";
 import GoogleDriveIcon from "@/components/icons/google-drive-logo";
-import IBMLogo from "@/components/icons/ibm-logo";
+import IBMCOSIcon from "@/components/icons/ibm-cos-icon";
 import OneDriveIcon from "@/components/icons/one-drive-logo";
 import SharePointIcon from "@/components/icons/share-point-logo";
 import { useAuth } from "@/contexts/auth-context";
@@ -35,7 +35,7 @@ export default function ConnectorCards() {
       "google-drive": <GoogleDriveIcon />,
       sharepoint: <SharePointIcon />,
       onedrive: <OneDriveIcon />,
-      "ibm-cos": <IBMLogo />,
+      "ibm-cos": <IBMCOSIcon />,
     };
     return (
       iconMap[iconName] || (

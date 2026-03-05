@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import IBMLogo from "@/components/icons/ibm-logo";
+import IBMCOSIcon from "@/components/icons/ibm-cos-icon";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -31,10 +31,12 @@ export default function IBMCOSSettingsDialog({
     // Fetch env-based defaults to pre-fill the form
     const { data: defaults } = useIBMCOSDefaultsQuery({ enabled: open });
 
+    const disableIam = defaults?.disable_iam ?? false;
+
     const methods = useForm<IBMCOSFormData>({
         mode: "onSubmit",
         values: {
-            auth_mode: defaults?.auth_mode ?? "iam",
+            auth_mode: disableIam ? "hmac" : (defaults?.auth_mode ?? "hmac"),
             endpoint: defaults?.endpoint ?? "",
             api_key: "",
             service_instance_id: defaults?.service_instance_id ?? "",
@@ -135,7 +137,7 @@ export default function IBMCOSSettingsDialog({
                     selectedBuckets.length > 0
                         ? `Will ingest from: ${selectedBuckets.join(", ")}`
                         : "Will auto-discover and ingest all accessible buckets.",
-                icon: <IBMLogo className="w-4 h-4" />,
+                icon: <IBMCOSIcon className="w-4 h-4" />,
             });
 
             queryClient.invalidateQueries({ queryKey: ["connectors"] });
@@ -153,7 +155,7 @@ export default function IBMCOSSettingsDialog({
                         <DialogHeader className="mb-2">
                             <DialogTitle className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded flex items-center justify-center bg-white border">
-                                    <IBMLogo className="text-black" />
+                                    <IBMCOSIcon className="text-black" />
                                 </div>
                                 IBM Cloud Object Storage Setup
                             </DialogTitle>
@@ -170,6 +172,7 @@ export default function IBMCOSSettingsDialog({
                             hmacAccessKeySet={defaults?.hmac_access_key_set}
                             hmacSecretKeySet={defaults?.hmac_secret_key_set}
                             formError={formError}
+                            disableIam={disableIam}
                         />
 
                         <DialogFooter className="mt-4">
