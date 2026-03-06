@@ -122,7 +122,7 @@
 
   /* IBM Light */
   [data-theme="ibm"] {
-    --background: 0 0% 97%; /* IBM Gray 10 #f4f4f4 */
+    --background: 0 0% 100%; /* same as OSS light #ffffff */
     --foreground: 0 0% 15%; /* IBM Gray 100 #262626 */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 15%;
@@ -135,10 +135,10 @@
     --secondary-foreground: 0 0% 15%;
     --secondary-hover: 0 0% 90%; /* IBM Gray 20 #e0e0e0 */
     --muted: 0 0% 90%; /* IBM Gray 20 #e0e0e0 */
-    --muted-foreground: 0 0% 38%; /* IBM Gray 60 #6f6f6f */
+    --muted-foreground: 0 0% 78%; /* IBM Gray 30 #C6C6C6 - Secondary text IBM */
     --accent: 0 0% 90%;
     --accent-foreground: 0 0% 15%;
-    --border: 0 0% 82%; /* IBM Gray 30 #c6c6c6 */
+    --border: 240 5% 96%; /* same as --muted from :root (240 5% 96%) */
     --input: 0 0% 82%;
     --ring: 217 100% 45%;
     --placeholder-foreground: 0 0% 56%; /* IBM Gray 50 #8d8d8d */
@@ -191,10 +191,10 @@
     --secondary-foreground: 0 0% 97%;
     --secondary-hover: 0 0% 18%; /* IBM Gray 80 #393939 */
     --muted: 0 0% 18%; /* IBM Gray 80 */
-    --muted-foreground: 0 0% 56%; /* IBM Gray 50 #8d8d8d */
+    --muted-foreground: 0 0% 32%; /* IBM Gray 70 #525252 - Secondary text IBM */
     --accent: 0 0% 18%;
     --accent-foreground: 0 0% 97%;
-    --border: 0 0% 26%; /* IBM Gray 70 #525252 */
+    --border: 0 0% 22%; /* IBM Gray 80 #393939 - Ui-border 3 */
     --input: 0 0% 26%;
     --ring: 217 100% 62%;
     --placeholder-foreground: 0 0% 38%; /* IBM Gray 60 */
