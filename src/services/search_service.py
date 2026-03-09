@@ -75,10 +75,10 @@ class SearchService:
             if filters:
                 # Map frontend filter names to backend field names
                 field_mapping = {
-                    "data_sources": "filename",
-                    "document_types": "mimetype",
+                    "data_sources": "filename.keyword",
+                    "document_types": "mimetype.keyword",
                     "owners": "owner_name.keyword",
-                    "connector_types": "connector_type",
+                    "connector_types": "connector_type.keyword",
                 }
 
                 for filter_key, values in filters.items():
@@ -234,10 +234,10 @@ class SearchService:
             if filters:
                 # Map frontend filter names to backend field names
                 field_mapping = {
-                    "data_sources": "filename",
-                    "document_types": "mimetype",
+                    "data_sources": "filename.keyword",
+                    "document_types": "mimetype.keyword",
                     "owners": "owner_name.keyword",
-                    "connector_types": "connector_type",
+                    "connector_types": "connector_type.keyword",
                 }
 
                 for filter_key, values in filters.items():
@@ -331,10 +331,10 @@ class SearchService:
             "query": query_block,
             "aggs": {
                 "data_sources": {"terms": {"field": "filename.keyword", "size": 20}},
-                "document_types": {"terms": {"field": "mimetype", "size": 10}},
+                "document_types": {"terms": {"field": "mimetype.keyword", "size": 10}},
                 "owners": {"terms": {"field": "owner_name.keyword", "size": 10}},
-                "connector_types": {"terms": {"field": "connector_type", "size": 10}},
-                "embedding_models": {"terms": {"field": "embedding_model", "size": 10}},
+                "connector_types": {"terms": {"field": "connector_type.keyword", "size": 10}},
+                "embedding_models": {"terms": {"field": "embedding_model.keyword", "size": 10}},
             },
             "_source": [
                 "filename",
@@ -401,11 +401,12 @@ class SearchService:
             results = await opensearch_client.search(
                 index=index_name, body=search_body, params=search_params
             )
-        except RequestError as e:
+        except Exception as e:
             error_message = str(e)
+            lowered_error = error_message.lower()
             if (
                 fallback_search_body is not None
-                and "unknown field [num_candidates]" in error_message.lower()
+                and "unknown field [num_candidates]" in lowered_error
             ):
                 logger.warning(
                     "OpenSearch cluster does not support num_candidates; retrying without it"
@@ -417,23 +418,83 @@ class SearchService:
                         params=search_params,
                     )
                 except RequestError as retry_error:
-                    logger.error(
-                        "OpenSearch retry without num_candidates failed",
-                        error=str(retry_error),
-                        search_body=fallback_search_body,
-                    )
-                    raise
+                    retry_error_message = str(retry_error)
+                    retry_lowered_error = retry_error_message.lower()
+                    if (
+                        not is_wildcard_match_all
+                        and ("not knn_vector type" in retry_lowered_error or "failed to create query: field" in retry_lowered_error)
+                    ):
+                        logger.warning(
+                            "KNN field is not queryable as knn_vector after num_candidates fallback; "
+                            "falling back to keyword-only search",
+                            error=retry_error_message,
+                        )
+                        keyword_query = {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "multi_match": {
+                                            "query": query,
+                                            "fields": ["text^2", "filename^1.5"],
+                                            "type": "best_fields",
+                                            "fuzziness": "AUTO",
+                                        }
+                                    }
+                                ],
+                                "filter": filter_clauses,
+                            }
+                        }
+                        keyword_search_body = copy.deepcopy(search_body)
+                        keyword_search_body["query"] = keyword_query
+                        keyword_search_body.pop("min_score", None)
+                        results = await opensearch_client.search(
+                            index=get_index_name(),
+                            body=keyword_search_body,
+                            params=search_params,
+                        )
+                    else:
+                        logger.error(
+                            "OpenSearch retry without num_candidates failed",
+                            error=retry_error_message,
+                            search_body=fallback_search_body,
+                        )
+                        raise
+            elif (
+                not is_wildcard_match_all
+                and ("not knn_vector type" in lowered_error or "failed to create query: field" in lowered_error)
+            ):
+                logger.warning(
+                    "KNN field is not queryable as knn_vector; falling back to keyword-only search",
+                    error=error_message,
+                )
+                keyword_query = {
+                    "bool": {
+                        "must": [
+                            {
+                                "multi_match": {
+                                    "query": query,
+                                    "fields": ["text^2", "filename^1.5"],
+                                    "type": "best_fields",
+                                    "fuzziness": "AUTO",
+                                }
+                            }
+                        ],
+                        "filter": filter_clauses,
+                    }
+                }
+                keyword_search_body = copy.deepcopy(search_body)
+                keyword_search_body["query"] = keyword_query
+                keyword_search_body.pop("min_score", None)
+                results = await opensearch_client.search(
+                    index=get_index_name(),
+                    body=keyword_search_body,
+                    params=search_params,
+                )
             else:
                 logger.error(
                     "OpenSearch query failed", error=error_message, search_body=search_body
                 )
                 raise
-        except Exception as e:
-            logger.error(
-                "OpenSearch query failed", error=str(e), search_body=search_body
-            )
-            # Re-raise the exception so the API returns the error to frontend
-            raise
 
         # Transform results (keep for backward compatibility)
         chunks = []

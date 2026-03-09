@@ -396,6 +396,7 @@ async def ingest_default_documents_when_ready(
             await _ingest_default_documents_url(
                 langflow_file_service=langflow_file_service,
                 session_manager=session_manager,
+                task_service=task_service,
                 docs_url=DEFAULT_DOCS_URL,
                 crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
             )
@@ -508,13 +509,16 @@ async def _ingest_default_documents_langflow(
 
 
 async def _ingest_default_documents_url(
-    langflow_file_service, session_manager, docs_url: str, crawl_depth: int
+    langflow_file_service, session_manager, task_service, docs_url: str, crawl_depth: int
 ):
-    """Ingest default docs by crawling a URL with the Langflow URL ingest flow."""
+    """Ingest default docs by crawling a URL with tracked task progress."""
     if langflow_file_service is None:
         raise ValueError("LangflowFileService is not available")
+    if task_service is None:
+        raise ValueError("TaskService is not available")
 
     from session_manager import AnonymousUser
+    from models.processors import LangflowUrlProcessor
 
     anonymous_user = AnonymousUser()
     effective_jwt = None
@@ -530,19 +534,34 @@ async def _ingest_default_documents_url(
         docs_url=docs_url,
         crawl_depth=crawl_depth,
     )
-    await langflow_file_service.run_url_ingestion_flow(
+    processor = LangflowUrlProcessor(
+        langflow_file_service=langflow_file_service,
+        session_manager=session_manager,
         docs_url=docs_url,
         crawl_depth=crawl_depth,
         jwt_token=effective_jwt,
-        owner=None,
+        owner_user_id=anonymous_user.user_id,
         owner_name=anonymous_user.name,
         owner_email=anonymous_user.email,
         connector_type="system_default",
         prevent_outside=True,
     )
+    task_id = await task_service.create_custom_task(
+        user_id=None,  # Anonymous shared task
+        items=[docs_url],
+        processor=processor,
+        original_filenames={docs_url: "OpenRAG docs refresh"},
+    )
+    logger.info(
+        "Started URL ingestion task for default documents",
+        task_id=task_id,
+        docs_url=docs_url,
+    )
 
 
-async def _delete_existing_default_docs(session_manager):
+async def _delete_existing_default_docs(
+    session_manager, include_system_default: bool = True
+):
     """Delete previously ingested default OpenRAG docs before reingestion."""
     from session_manager import AnonymousUser
 
@@ -564,31 +583,38 @@ async def _delete_existing_default_docs(session_manager):
     opensearch_client = session_manager.get_user_opensearch_client(
         anonymous_user.user_id, effective_jwt
     )
+    should_clauses = []
+    if include_system_default:
+        # URL-based default docs are ingested as system_default and owned
+        # by the anonymous onboarding user.
+        should_clauses.append(
+            {
+                "bool": {
+                    "must": [
+                        {"term": {"connector_type": "system_default"}},
+                        {"term": {"owner_email": anonymous_user.email}},
+                    ]
+                }
+            }
+        )
+
+    # Legacy file-based default docs were ingested as local and
+    # marked with is_sample_data=true.
+    should_clauses.append(
+        {
+            "bool": {
+                "must": [
+                    {"term": {"connector_type": "local"}},
+                    {"term": {"is_sample_data": "true"}},
+                ]
+            }
+        }
+    )
+
     delete_query = {
         "query": {
             "bool": {
-                "should": [
-                    # URL-based default docs are ingested as system_default and
-                    # owned by the anonymous onboarding user.
-                    {
-                        "bool": {
-                            "must": [
-                                {"term": {"connector_type": "system_default"}},
-                                {"term": {"owner_email": anonymous_user.email}},
-                            ]
-                        }
-                    },
-                    # Legacy file-based default docs were ingested as local and
-                    # marked with is_sample_data=true.
-                    {
-                        "bool": {
-                            "must": [
-                                {"term": {"connector_type": "local"}},
-                                {"term": {"is_sample_data": "true"}},
-                            ]
-                        }
-                    },
-                ],
+                "should": should_clauses,
                 "minimum_should_match": 1,
             }
         }
@@ -789,7 +815,13 @@ async def refresh_default_openrag_docs(
             previous_signature=previous_signature,
             new_signature=signature,
         )
-        await _delete_existing_default_docs(session_manager)
+        # Keep existing system_default docs in place for manual refresh.
+        # URL refresh ingestion runs asynchronously, so pre-deleting could
+        # make docs disappear if the downstream flow returns success without
+        # actually indexing documents.
+        await _delete_existing_default_docs(
+            session_manager, include_system_default=False
+        )
         await ingest_default_documents_when_ready(
             document_service,
             task_service,

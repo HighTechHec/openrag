@@ -102,6 +102,15 @@ async def delete_document_endpoint(
 
         deleted_count = result.get("deleted", 0)
         logger.info(f"Deleted {deleted_count} chunks for filename {filename}", user_id=user.user_id)
+        if deleted_count == 0:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "deleted_chunks": 0,
+                    "error": "No matching document chunks were deleted. The file may be missing or not deletable in the current user context.",
+                },
+                status_code=404,
+            )
         return JSONResponse({"success": True, "deleted_chunks": deleted_count})
 
     except Exception as e:

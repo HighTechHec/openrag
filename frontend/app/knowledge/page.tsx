@@ -80,7 +80,7 @@ interface IngestionStatus {
 function SearchPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { files: taskFiles, refreshTasks } = useTask();
+  const { files: taskFiles, tasks, refreshTasks } = useTask();
   const { parsedFilterData, queryOverride } = useKnowledgeFilter();
   const [selectedRows, setSelectedRows] = useState<File[]>([]);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
@@ -102,6 +102,27 @@ function SearchPage() {
     error,
     isError,
   } = useGetSearchQuery(queryOverride, parsedFilterData);
+
+  const isOpenragDocsRow = useCallback((file?: File) => {
+    return file?.connector_type === "system_default";
+  }, []);
+
+  const hasOpenragRefreshCue = tasks.some((task) => {
+    const isTaskActive =
+      task.status === "pending" ||
+      task.status === "running" ||
+      task.status === "processing";
+    if (!isTaskActive || !task.files) {
+      return false;
+    }
+
+    return Object.entries(task.files).some(([fileKey, fileInfo]) => {
+      const filename = (fileInfo as { filename?: string })?.filename ?? "";
+      return (
+        filename === "OpenRAG docs refresh" || fileKey.includes("docs.openr.ag")
+      );
+    });
+  });
 
   // Show toast notification for search errors
   useEffect(() => {
@@ -139,8 +160,13 @@ function SearchPage() {
   const taskFileMap = new Map(
     taskFilesAsFiles.map((file) => [file.filename, file]),
   );
-  // Override backend files with task file status if they exist
+  // Override backend files with task file status if they exist.
+  // Keep system_default rows sourced from indexed search results so
+  // OpenRAG docs do not appear as pending in the table.
   const backendFiles = (searchData as File[]).map((file) => {
+    if (file.connector_type === "system_default") {
+      return file;
+    }
     const taskFile = taskFileMap.get(file.filename);
     if (taskFile) {
       // Override backend file with task file data (includes status)
@@ -150,6 +176,19 @@ function SearchPage() {
   });
 
   const filteredTaskFiles = taskFilesAsFiles.filter((taskFile) => {
+    // Ignore the synthetic refresh task row from docs URL ingestion.
+    // The table should only show indexed docs, not orchestration task labels.
+    if (
+      taskFile.filename === "OpenRAG docs refresh" ||
+      taskFile.source_url.includes("docs.openr.ag")
+    ) {
+      return false;
+    }
+    // Do not render task-only system_default placeholder rows in the table.
+    // OpenRAG default docs should be represented only by indexed search results.
+    if (taskFile.connector_type === "system_default") {
+      return false;
+    }
     return (
       taskFile.status !== "active" &&
       !backendFiles.some(
@@ -174,6 +213,8 @@ function SearchPage() {
         // Read status directly from data on each render
         const status = data?.status || "active";
         const isActive = status === "active";
+        const showOpenragSourceAnimation =
+          isOpenragDocsRow(data) && hasOpenragRefreshCue;
         return (
           <div className="flex items-center overflow-hidden w-full">
             <div
@@ -198,7 +239,13 @@ function SearchPage() {
               {getSourceIcon(data?.connector_type)}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="font-medium text-foreground truncate">
+                  <span
+                    className={`font-medium truncate ${
+                      showOpenragSourceAnimation
+                        ? "text-primary animate-pulse"
+                        : "text-foreground"
+                    }`}
+                  >
                     {value}
                   </span>
                 </TooltipTrigger>
@@ -271,10 +318,21 @@ function SearchPage() {
       headerName: "Status",
       cellRenderer: ({ data }: CustomCellRendererProps<File>) => {
         const status = data?.status || "active";
+        const showOpenragRefreshCue = isOpenragDocsRow(data) && hasOpenragRefreshCue;
         const error =
           typeof data?.error === "string" && data.error.trim().length > 0
             ? data.error.trim()
             : undefined;
+        if (showOpenragRefreshCue) {
+          return (
+            <div className="inline-flex items-center justify-center h-5 w-5">
+              <RefreshCw
+                className="h-4 w-4 text-primary animate-spin"
+                aria-label="OpenRAG doc is refreshing"
+              />
+            </div>
+          );
+        }
         if (status === "failed" && error) {
           return (
             <button
@@ -295,13 +353,14 @@ function SearchPage() {
     {
       cellRenderer: ({ data }: CustomCellRendererProps<File>) => {
         const status = data?.status || "active";
-        if (status !== "active") {
+        const connectorType = data?.connector_type;
+        if (status !== "active" || connectorType === "system_default") {
           return null;
         }
         return (
           <KnowledgeActionsDropdown
             filename={data?.filename || ""}
-            connectorType={data?.connector_type}
+            connectorType={connectorType}
           />
         );
       },
@@ -344,16 +403,38 @@ function SearchPage() {
         deleteDocumentMutation.mutateAsync({ filename: row.filename }),
       );
 
-      await Promise.all(deletePromises);
+      const deleteResults = await Promise.all(deletePromises);
       await refreshTasks();
       await queryClient.invalidateQueries({ queryKey: ["search"] });
       await queryClient.refetchQueries({ queryKey: ["search"] });
 
-      toast.success(
-        `Successfully deleted ${selectedRows.length} document${
-          selectedRows.length > 1 ? "s" : ""
-        }`,
+      const totalDeletedChunks = deleteResults.reduce(
+        (sum, result) => sum + (result.deleted_chunks || 0),
+        0,
       );
+      const filesWithNoDeletion = deleteResults.filter(
+        (result) => (result.deleted_chunks || 0) === 0,
+      );
+
+      if (totalDeletedChunks > 0) {
+        toast.success(
+          `Successfully deleted ${selectedRows.length} document${
+            selectedRows.length > 1 ? "s" : ""
+          }`,
+        );
+      } else {
+        toast.warning(
+          "No document chunks were deleted. Files may be owned by another context or already removed.",
+        );
+      }
+
+      if (filesWithNoDeletion.length > 0 && totalDeletedChunks > 0) {
+        toast.warning(
+          `${filesWithNoDeletion.length} selected file${
+            filesWithNoDeletion.length > 1 ? "s were" : " was"
+          } not deleted (0 chunks matched).`,
+        );
+      }
       setSelectedRows([]);
       setShowBulkDeleteDialog(false);
 
