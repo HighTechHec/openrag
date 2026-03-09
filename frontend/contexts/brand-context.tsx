@@ -45,3 +45,5 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useBrand = () => useContext(BrandContext);
+
+export const useIsCloudBrand = () => useContext(BrandContext).brand === "ibm";
