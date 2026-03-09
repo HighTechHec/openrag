@@ -40,5 +40,6 @@ openrag = "tui.main:run_tui"
 
 [tool.uv]
 package = true
+python-preference = "only-managed"
 
 
