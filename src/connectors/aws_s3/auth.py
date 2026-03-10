@@ -67,10 +67,7 @@ def create_s3_resource(config: Dict[str, Any]):
 
     creds = _resolve_credentials(config)
     kwargs = _build_boto3_kwargs(creds)
-    logger.debug(
-        "Creating S3 resource with HMAC authentication (boto3), "
-        f"endpoint={creds['endpoint_url']!r}, region={creds['region']!r}"
-    )
+    logger.debug("Creating S3 resource with HMAC authentication (boto3)")
     return boto3.resource("s3", **kwargs)
 
 
@@ -89,8 +86,5 @@ def create_s3_client(config: Dict[str, Any]):
 
     creds = _resolve_credentials(config)
     kwargs = _build_boto3_kwargs(creds)
-    logger.debug(
-        "Creating S3 client with HMAC authentication (boto3), "
-        f"endpoint={creds['endpoint_url']!r}, region={creds['region']!r}"
-    )
+    logger.debug("Creating S3 client with HMAC authentication (boto3)")
     return boto3.client("s3", **kwargs)

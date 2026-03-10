@@ -58,7 +58,12 @@ class IBMCOSConnector(BaseConnector):
 
     def get_client_id(self) -> str:
         """Return IAM API key, or HMAC access key ID as fallback."""
-        val = os.getenv("IBM_COS_API_KEY") or os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID")
+        val = (
+            self.config.get("api_key")
+            or self.config.get("hmac_access_key")
+            or os.getenv("IBM_COS_API_KEY")
+            or os.getenv("IBM_COS_HMAC_ACCESS_KEY_ID")
+        )
         if val:
             return val
         raise ValueError(
@@ -68,7 +73,12 @@ class IBMCOSConnector(BaseConnector):
 
     def get_client_secret(self) -> str:
         """Return IAM service instance ID, or HMAC secret key as fallback."""
-        val = os.getenv("IBM_COS_SERVICE_INSTANCE_ID") or os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY")
+        val = (
+            self.config.get("service_instance_id")
+            or self.config.get("hmac_secret_key")
+            or os.getenv("IBM_COS_SERVICE_INSTANCE_ID")
+            or os.getenv("IBM_COS_HMAC_SECRET_ACCESS_KEY")
+        )
         if val:
             return val
         raise ValueError(
@@ -142,7 +152,7 @@ class IBMCOSConnector(BaseConnector):
             else:
                 resp = handle.list_buckets()
                 buckets = [b["Name"] for b in resp.get("Buckets", [])]
-            logger.debug(f"IBM COS auto-discovered {len(buckets)} bucket(s): {buckets}")
+            logger.debug("IBM COS auto-discovered %d bucket(s)", len(buckets))
             return buckets
         except Exception as exc:
             logger.warning(f"IBM COS could not auto-discover buckets: {exc}")
@@ -228,7 +238,7 @@ class IBMCOSConnector(BaseConnector):
                             break
 
             except Exception as exc:
-                logger.error(f"Failed to list objects in bucket {bucket_name!r}: {exc}")
+                logger.error("Failed to list objects in IBM COS bucket: %s", exc)
                 continue
 
         return {"files": files, "next_page_token": None}
@@ -326,10 +336,7 @@ class IBMCOSConnector(BaseConnector):
                 allowed_groups=[],
             )
         except Exception as exc:
-            logger.warning(
-                f"Could not fetch ACL for cos://{bucket}/{key}: {exc}. "
-                "Using fallback ACL."
-            )
+            logger.warning("Could not fetch IBM COS object ACL, using fallback: %s", exc)
             return DocumentACL(
                 owner=self._service_instance_id or None,
                 allowed_users=[],

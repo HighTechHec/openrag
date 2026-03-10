@@ -117,7 +117,7 @@ class S3Connector(BaseConnector):
         try:
             resource = self._get_resource()
             buckets = [b.name for b in resource.buckets.all()]
-            logger.debug(f"S3 auto-discovered {len(buckets)} bucket(s): {buckets}")
+            logger.debug("S3 auto-discovered %d bucket(s)", len(buckets))
             return buckets
         except Exception as exc:
             logger.warning(f"S3 could not auto-discover buckets: {exc}")
@@ -169,7 +169,7 @@ class S3Connector(BaseConnector):
                     if max_files and len(files) >= max_files:
                         return {"files": files, "next_page_token": None}
             except Exception as exc:
-                logger.error(f"Failed to list objects in S3 bucket {bucket_name!r}: {exc}")
+                logger.error("Failed to list objects in S3 bucket: %s", exc)
                 continue
 
         return {"files": files, "next_page_token": None}
@@ -252,10 +252,7 @@ class S3Connector(BaseConnector):
                 allowed_groups=[],
             )
         except Exception as exc:
-            logger.warning(
-                f"Could not fetch ACL for s3://{bucket}/{key}: {exc}. "
-                "Using fallback ACL."
-            )
+            logger.warning("Could not fetch S3 object ACL, using fallback: %s", exc)
             return DocumentACL(owner=None, allowed_users=[], allowed_groups=[])
 
     # ------------------------------------------------------------------

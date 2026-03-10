@@ -862,7 +862,7 @@ async def ibm_cos_bucket_status(
     Each entry includes the bucket name, whether it has been ingested (is_synced),
     and the count of indexed documents from that bucket.
     """
-    from connectors.ibm_cos.auth import create_ibm_cos_client, create_ibm_cos_resource
+    from connectors.ibm_cos.auth import create_ibm_cos_resource
 
     connection = await connector_service.connection_manager.get_connection(connection_id)
     if not connection or connection.user_id != user.user_id:
