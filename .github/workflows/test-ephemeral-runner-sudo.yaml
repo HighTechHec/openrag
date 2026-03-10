@@ -1,0 +1,24 @@
+name: 🧪 test invoke ephemeral runner sudo   
+on:
+  push: 
+    branches: [test-ephemeral-runner-sudo]
+
+jobs:
+  show-runner-info:
+    runs-on: 
+      labels: ["self-hosted", "linux", "ARM64", "langflow-ai-arm64-40gb-ephemeral-sudo"]
+    permissions:
+      actions: read
+      contents: read
+    steps:
+    - name: Check runner permissions
+      run: |
+        echo "Current user: $(whoami)"
+        echo "Sudo test: $(sudo whoami)"
+        sudo -l
+
+    - name: Install Playwright
+      run: npm install playwright
+
+    - name: Verify Playwright
+      run: npx playwright --version      
