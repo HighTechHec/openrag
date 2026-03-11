@@ -730,22 +730,6 @@ class LangflowFileProcessor(TaskProcessor):
         file_task.updated_at = time.time()
 
         try:
-            owner_user_id = self.owner_user_id
-            owner_name = self.owner_name
-            owner_email = self.owner_email
-            if self.session_manager and (not owner_name or not owner_email):
-                try:
-                    from session_manager import AnonymousUser
-
-                    anonymous_user = AnonymousUser()
-                    if owner_user_id in (None, anonymous_user.user_id):
-                        owner_user_id = anonymous_user.user_id
-                        owner_name = owner_name or anonymous_user.name
-                        owner_email = owner_email or anonymous_user.email
-                except Exception:
-                    # Best effort: keep existing values if anonymous resolution fails.
-                    pass
-
             # Use the ORIGINAL filename stored in file_task (not the transformed temp path)
             # This ensures we check/store the original filename with spaces, etc.
             original_filename = file_task.filename or os.path.basename(item)
@@ -795,7 +779,7 @@ class LangflowFileProcessor(TaskProcessor):
             if self.session_manager and not effective_jwt:
                 # Let session manager handle anonymous JWT creation if needed
                 self.session_manager.get_user_opensearch_client(
-                    owner_user_id, self.jwt_token
+                    self.owner_user_id, self.jwt_token
                 )
                 # The session manager would have created anonymous JWT if needed
                 # Get it from the session manager's internal state
@@ -813,9 +797,9 @@ class LangflowFileProcessor(TaskProcessor):
                 settings=self.settings,
                 jwt_token=effective_jwt,
                 delete_after_ingest=self.delete_after_ingest,
-                owner=owner_user_id,
-                owner_name=owner_name,
-                owner_email=owner_email,
+                owner=self.owner_user_id,
+                owner_name=self.owner_name,
+                owner_email=self.owner_email,
                 connector_type="local",
 
             )
