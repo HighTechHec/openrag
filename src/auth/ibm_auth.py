@@ -27,7 +27,14 @@ async def fetch_ibm_public_key(url: str):
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(url)
         resp.raise_for_status()
-        _cached_public_key = load_pem_public_key(resp.content)
+        data = resp.json()
+        public_key_pem = data.get("public_key")
+        if not public_key_pem:
+            logger.error("IBM JWT public key not found in response")
+            raise ValueError("IBM JWT public key not found in response")
+        if isinstance(public_key_pem, str):
+            public_key_pem = public_key_pem.encode("utf-8")
+        _cached_public_key = load_pem_public_key(public_key_pem)
     logger.info("IBM JWT public key cached successfully")
     return _cached_public_key
 
