@@ -38,8 +38,8 @@ async def upload(
 
         if is_no_auth_mode():
             owner_user_id = None
-            owner_name = None
-            owner_email = None
+            owner_name = user.name
+            owner_email = user.email
         else:
             owner_user_id = user.user_id
             owner_name = user.name
@@ -87,8 +87,8 @@ async def upload_path(
 
     if is_no_auth_mode():
         owner_user_id = None
-        owner_name = None
-        owner_email = None
+        owner_name = user.name
+        owner_email = user.email
     else:
         owner_user_id = user.user_id
         owner_name = user.name
@@ -198,8 +198,8 @@ async def upload_bucket(
 
     if is_no_auth_mode():
         owner_user_id = None
-        owner_name = None
-        owner_email = None
+        owner_name = user.name
+        owner_email = user.email
         task_user_id = None
     else:
         owner_user_id = user.user_id

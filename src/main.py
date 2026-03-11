@@ -408,7 +408,8 @@ async def ingest_default_documents_when_ready(
         use_url_ingest = _should_use_url_default_docs_ingest()
         if use_url_ingest:
             await _ingest_default_documents_url(
-                document_service=document_service,
+                langflow_file_service=langflow_file_service,
+                session_manager=session_manager,
                 docs_url=DEFAULT_DOCS_URL,
                 crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
             )
@@ -520,16 +521,17 @@ async def _ingest_default_documents_langflow(
 
 
 async def _ingest_default_documents_url(
-    document_service,
+    langflow_file_service,
+    session_manager,
     docs_url: str,
     crawl_depth: int,
 ):
-    """Ingest default docs from URL using OpenRAG ingestion logic (no Langflow)."""
+    """Ingest default docs from URL using Langflow ingestion pipeline."""
     if not docs_url:
         raise ValueError("DEFAULT_DOCS_URL is not configured")
 
     logger.info(
-        "Running default URL docs ingestion with OpenRAG processor",
+        "Running default URL docs ingestion with Langflow service",
         docs_url=docs_url,
         crawl_depth=crawl_depth,
     )
@@ -538,29 +540,31 @@ async def _ingest_default_documents_url(
         crawl_depth=crawl_depth,
     )
     try:
-        from models.processors import DocumentFileProcessor
-        from utils.hash_utils import hash_id
+        from session_manager import AnonymousUser
 
-        processor = DocumentFileProcessor(
-            document_service,
-            owner_user_id=None,
-            jwt_token=None,
-            owner_name=None,
-            owner_email=None,
-            is_sample_data=True,
+        anonymous_user = AnonymousUser()
+        effective_jwt = None
+        if session_manager:
+            session_manager.get_user_opensearch_client(
+                anonymous_user.user_id, effective_jwt
+            )
+            if hasattr(session_manager, "_anonymous_jwt"):
+                effective_jwt = session_manager._anonymous_jwt
+
+        with open(temp_file_path, "rb") as f:
+            content = f.read()
+
+        await langflow_file_service.upload_and_ingest_file(
+            file_tuple=("openrag-url-default.txt", content, "text/plain"),
+            session_id=None,
+            tweaks={},
+            settings=None,
+            jwt_token=effective_jwt,
+            delete_after_ingest=True,
+            owner=anonymous_user.user_id,
+            owner_name=anonymous_user.name,
+            owner_email=anonymous_user.email,
             connector_type="system_default",
-        )
-        await processor.process_document_standard(
-            file_path=temp_file_path,
-            file_hash=hash_id(temp_file_path),
-            owner_user_id=None,
-            original_filename="openrag-url-default.txt",
-            jwt_token=None,
-            owner_name=None,
-            owner_email=None,
-            file_size=os.path.getsize(temp_file_path),
-            connector_type="system_default",
-            is_sample_data=True,
         )
     finally:
         try:
