@@ -18,6 +18,7 @@ import { useGetTasksQuery } from "@/app/api/queries/useGetTasksQuery";
 import { DuplicateHandlingDialog } from "@/components/duplicate-handling-dialog";
 import AwsIcon from "@/components/icons/aws-logo";
 import GoogleDriveIcon from "@/components/icons/google-drive-logo";
+import IBMCOSIcon from "@/components/icons/ibm-cos-icon";
 import OneDriveIcon from "@/components/icons/one-drive-logo";
 import SharePointIcon from "@/components/icons/share-point-logo";
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,10 @@ export function KnowledgeDropdown() {
             "google_drive",
             "onedrive",
             "sharepoint",
+            "ibm_cos",
+            "aws_s3",
           ];
+          const directSyncTypes = new Set(["ibm_cos", "aws_s3"]);
           const connectorInfo: {
             [key: string]: {
               name: string;
@@ -170,19 +174,23 @@ export function KnowledgeDropdown() {
                   if (isConnected && activeConnection) {
                     connectorInfo[type].connected = true;
 
-                    // Check token availability
-                    try {
-                      const tokenRes = await fetch(
-                        `/api/connectors/${type}/token?connection_id=${activeConnection.connection_id}`,
-                      );
-                      if (tokenRes.ok) {
-                        const tokenData = await tokenRes.json();
-                        if (tokenData.access_token) {
-                          connectorInfo[type].hasToken = true;
+                    if (directSyncTypes.has(type)) {
+                      connectorInfo[type].hasToken = true;
+                    } else {
+                      // Check token availability for OAuth connectors
+                      try {
+                        const tokenRes = await fetch(
+                          `/api/connectors/${type}/token?connection_id=${activeConnection.connection_id}`,
+                        );
+                        if (tokenRes.ok) {
+                          const tokenData = await tokenRes.json();
+                          if (tokenData.access_token) {
+                            connectorInfo[type].hasToken = true;
+                          }
                         }
+                      } catch {
+                        // Token check failed
                       }
-                    } catch {
-                      // Token check failed
                     }
                   }
                 }
@@ -509,10 +517,12 @@ export function KnowledgeDropdown() {
     google_drive: GoogleDriveIcon,
     onedrive: OneDriveIcon,
     sharepoint: SharePointIcon,
+    ibm_cos: IBMCOSIcon,
+    aws_s3: AwsIcon,
   };
 
   const cloudConnectorItems = Object.entries(cloudConnectors)
-    .filter(([, info]) => info.available)
+    .filter(([, info]) => info.available || info.connected)
     .map(([type, info]) => ({
       label: info.name,
       icon: connectorIconMap[type as keyof typeof connectorIconMap] || PlugZap,

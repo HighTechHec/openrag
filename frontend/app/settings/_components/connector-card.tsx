@@ -42,10 +42,8 @@ export default function ConnectorCard({
   onNavigateToKnowledge,
   onConfigure,
 }: ConnectorCardProps) {
-  console.log(connector);
   const isConnected =
-    connector?.name === "Google Drive" ||
-    (connector?.status === "connected" && connector?.connectionId);
+    connector?.status === "connected" && connector?.connectionId;
 
   return (
     <Card className="group relative flex flex-col hover:bg-secondary-hover hover:border-muted-foreground transition-colors">
@@ -77,72 +75,56 @@ export default function ConnectorCard({
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-end space-y-4">
-        {connector?.available ? (
-          <div className="space-y-3">
-            {isConnected ? (
-              <div className="flex gap-2 overflow-hidden w-full">
-                <Button
-                  variant="default"
-                  onClick={() => onNavigateToKnowledge(connector)}
-                  disabled={isDisconnecting || isConnecting}
-                  className="cursor-pointer !text-sm truncate rounded-md flex-1"
-                  size="md"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="text-mmd truncate">Add Knowledge</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => onConnect(connector)}
-                  disabled={isConnecting || isDisconnecting}
-                  className="cursor-pointer"
-                  size="iconMd"
-                >
-                  {isConnecting ? (
-                    <RefreshCcw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCcw className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => onDisconnect(connector)}
-                  disabled={isDisconnecting || isConnecting}
-                  className="cursor-pointer text-destructive hover:text-destructive"
-                  size="iconMd"
-                >
-                  {isDisconnecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            ) : (
+        {isConnected ? (
+          <div className="flex gap-2 overflow-hidden w-full">
+            <Button
+              variant="default"
+              onClick={() => onNavigateToKnowledge(connector)}
+              disabled={isDisconnecting || isConnecting}
+              className="cursor-pointer !text-sm truncate rounded-md flex-1"
+              size="md"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="text-mmd truncate">Add Knowledge</span>
+            </Button>
+            {onConfigure && (
               <Button
                 variant="outline"
-                onClick={() => onConnect(connector)}
+                onClick={() => onConfigure(connector)}
                 disabled={isConnecting || isDisconnecting}
                 className="cursor-pointer"
                 size="iconMd"
               >
-                {isConnecting ? (
-                  <RefreshCcw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCcw className="h-4 w-4" />
-                )}
+                <Settings2 className="h-4 w-4" />
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => onConnect(connector)}
+              disabled={isConnecting || isDisconnecting}
+              className="cursor-pointer"
+              size="iconMd"
+            >
+              {isConnecting ? (
+                <RefreshCcw className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onDisconnect(connector)}
+              disabled={isDisconnecting || isConnecting}
+              className="cursor-pointer text-destructive hover:text-destructive"
+              size="iconMd"
+            >
+              {isDisconnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-        ) : onConfigure ? (
-          <Button
-            onClick={() => onConfigure(connector)}
-            disabled={isConnecting}
-            className="w-full cursor-pointer group-hover:bg-background group-hover:border-zinc-700 group-hover:text-primary"
-            size="sm"
-          >
-            Configure
-          </Button>
         ) : connector?.available ? (
           <Button
             onClick={() => onConnect(connector)}
@@ -158,6 +140,15 @@ export default function ConnectorCard({
             ) : (
               <>Connect</>
             )}
+          </Button>
+        ) : onConfigure ? (
+          <Button
+            onClick={() => onConfigure(connector)}
+            disabled={isConnecting}
+            className="w-full cursor-pointer group-hover:bg-background group-hover:border-zinc-700 group-hover:text-primary"
+            size="sm"
+          >
+            Configure
           </Button>
         ) : (
           <div className="text-sm text-muted-foreground">
