@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from utils.telemetry import TelemetryClient, Category, MessageId
 
@@ -18,6 +18,8 @@ class AuthInitBody(BaseModel):
     purpose: str = "data_source"
     name: Optional[str] = None
     redirect_uri: Optional[str] = None
+
+
 
 
 class AuthCallbackBody(BaseModel):
@@ -127,5 +129,32 @@ async def auth_logout(
     response.delete_cookie(
         key="auth_token", httponly=True, secure=False, samesite="lax"
     )
+
+    return response
+
+
+async def ibm_login(request: Request):
+    """IBM login endpoint — Basic Auth header is validated by Traefik in production.
+
+    When running without Traefik (local dev), this endpoint sets an ibm-auth-basic
+    session cookie from the Basic Auth header so subsequent requests are authenticated.
+    """
+    from config.settings import IBM_AUTH_ENABLED
+
+    if not IBM_AUTH_ENABLED:
+        raise HTTPException(status_code=404, detail="IBM auth is not enabled")
+
+    response = JSONResponse({"status": "ok"})
+
+    # Persist the Basic Auth header as a cookie so /auth/me and other endpoints
+    # can authenticate subsequent requests (Traefik handles this in production).
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Basic "):
+        response.set_cookie(
+            "ibm-auth-basic",
+            auth_header,
+            httponly=True,
+            samesite="lax",
+        )
 
     return response

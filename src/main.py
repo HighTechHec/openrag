@@ -762,6 +762,7 @@ async def create_app():
     app.add_api_route("/auth/callback", auth.auth_callback, methods=["POST"], tags=["internal"])
     app.add_api_route("/auth/me", auth.auth_me, methods=["GET"], tags=["internal"])
     app.add_api_route("/auth/logout", auth.auth_logout, methods=["POST"], tags=["internal"])
+    app.add_api_route("/auth/ibm/login", auth.ibm_login, methods=["POST"], tags=["internal"])
 
     # Connector endpoints
     app.add_api_route("/connectors", connectors.list_connectors, methods=["GET"], tags=["internal"])

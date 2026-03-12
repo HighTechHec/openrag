@@ -772,8 +772,16 @@ class AppClients:
             )
 
     def create_user_opensearch_client(self, jwt_token: str):
-        """Create OpenSearch client with user's JWT token for OIDC auth"""
-        headers = {"Authorization": f"Bearer {jwt_token}"}
+        """Create OpenSearch client with user's auth token.
+
+        If jwt_token already contains an auth scheme (e.g. "Basic ..." or "Bearer ..."),
+        it is used verbatim. Otherwise it is wrapped as a Bearer token.
+        """
+        if jwt_token.startswith(("Basic ", "Bearer ")):
+            auth_header = jwt_token
+        else:
+            auth_header = f"Bearer {jwt_token}"
+        headers = {"Authorization": auth_header}
 
         return AsyncOpenSearch(
             hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
