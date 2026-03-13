@@ -1064,7 +1064,9 @@ class FlowsService:
 
             updated = True
 
-        # Update provider-specific fields
+        # Update provider-specific fields using Langflow global variable names.
+        # "api_base" is the Ollama URL field on the Embedding Model component;
+        # "ollama_base_url" is the equivalent field on the Language Model / Agent component.
         field_mappings = {
             "api_key": {
                 "openai": "OPENAI_API_KEY",
@@ -1072,6 +1074,9 @@ class FlowsService:
                 "anthropic": "ANTHROPIC_API_KEY",
             },
             "api_base": {
+                "ollama": "OLLAMA_BASE_URL",
+            },
+            "ollama_base_url": {
                 "ollama": "OLLAMA_BASE_URL",
             },
             "base_url_ibm_watsonx": {
