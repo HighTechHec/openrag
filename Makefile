@@ -527,12 +527,14 @@ factory-reset: ## Complete reset (stop, remove volumes, clear data, remove image
 	fi; \
 	if [ -d "config" ]; then \
 		echo "Removing config..."; \
+		$(CONTAINER_RUNTIME) run --rm -v "$$(pwd)/config:/data" alpine sh -c "rm -rf /data/*" 2>/dev/null || true; \
 		rm -rf config; \
 		echo "$(PURPLE)config removed$(NC)"; \
 	fi; \
-	if [ -f "keys/private_key.pem" ] || [ -f "keys/public_key.pem" ]; then \
-		echo "Removing JWT keys..."; \
-		rm -f keys/private_key.pem keys/public_key.pem; \
+	if [ -d "keys" ]; then \
+		echo "Removing keys..."; \
+		$(CONTAINER_RUNTIME) run --rm -v "$$(pwd)/keys:/data" alpine sh -c "rm -rf /data/*" 2>/dev/null || true; \
+		rm -rf keys; \
 		echo "$(PURPLE)JWT keys removed$(NC)"; \
 	fi; \
 	echo "$(YELLOW)Removing OpenRAG images...$(NC)"; \
