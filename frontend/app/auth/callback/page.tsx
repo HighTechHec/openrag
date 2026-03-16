@@ -80,13 +80,31 @@ function AuthCallbackContent() {
         }
 
         // Send callback data to backend
+        const stateParam = searchParams.get("state");
+        let parsedConnectionId = finalConnectorId;
+        let stateReturnUrl = null;
+
+        if (stateParam && stateParam.includes("id=")) {
+          try {
+            const params = new URLSearchParams(stateParam);
+            parsedConnectionId = params.get("id") || finalConnectorId;
+            stateReturnUrl = params.get("return");
+            console.log("Parsed state parameter:", {
+              parsedConnectionId,
+              stateReturnUrl,
+            });
+          } catch (e) {
+            console.error("Failed to parse state parameter", e);
+          }
+        }
+
         const response = await fetch("/api/auth/callback", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            connection_id: finalConnectorId,
+            connection_id: parsedConnectionId,
             authorization_code: code,
             state: state,
           }),
@@ -101,8 +119,9 @@ function AuthCallbackContent() {
             // App authentication - refresh auth context and redirect to home/original page
             await refreshAuth();
 
-            // Get redirect URL from login page
-            const redirectTo = searchParams.get("redirect") || "/chat";
+            // Get redirect URL from state, search params, or default
+            const redirectTo =
+              stateReturnUrl || searchParams.get("redirect") || "/chat";
 
             // Clean up localStorage
             localStorage.removeItem("connecting_connector_id");

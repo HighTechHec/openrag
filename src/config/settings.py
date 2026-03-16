@@ -101,6 +101,9 @@ WEBHOOK_BASE_URL = os.getenv(
     "WEBHOOK_BASE_URL"
 )  # No default - must be explicitly configured
 
+# Public return URL for OAuth flows (Broker redirect)
+PUBLIC_RETURN_URL = os.getenv("PUBLIC_RETURN_URL")
+
 # OpenSearch configuration
 VECTOR_DIM = 1536
 KNN_EF_CONSTRUCTION = 100

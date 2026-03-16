@@ -9,8 +9,6 @@ from typing import Optional
 import asyncio
 
 from config.settings import WEBHOOK_BASE_URL, is_no_auth_mode
-
-logger = logging.getLogger(__name__)
 from session_manager import SessionManager
 from services.langflow_mcp_service import LangflowMCPService
 from connectors.google_drive.oauth import GoogleDriveOAuth
@@ -19,6 +17,8 @@ from connectors.sharepoint.oauth import SharePointOAuth
 from connectors.google_drive import GoogleDriveConnector
 from connectors.onedrive import OneDriveConnector
 from connectors.sharepoint import SharePointConnector
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -93,7 +93,6 @@ class AuthService:
         )
 
         # Get OAuth configuration from connector and OAuth classes
-        import os
 
         # Map connector types to their connector and OAuth classes
         connector_class_map = {
@@ -138,15 +137,17 @@ class AuthService:
                 f"Set {client_key} and {secret_key} in the environment."
             )
 
-        oauth_config = {
-            "client_id": client_id,
-            "scopes": scopes,
-            "redirect_uri": redirect_uri,
-            "authorization_endpoint": auth_endpoint,
-            "token_endpoint": token_endpoint,
+        return {
+            "connection_id": connection_id,
+            "oauth_config": {
+                "client_id": client_id,
+                "scopes": scopes,
+                "redirect_uri": redirect_uri,
+                "authorization_endpoint": auth_endpoint,
+                "token_endpoint": token_endpoint,
+            },
+            "public_return_url": os.getenv("PUBLIC_RETURN_URL"),
         }
-
-        return {"connection_id": connection_id, "oauth_config": oauth_config}
 
     async def handle_oauth_callback(
         self,

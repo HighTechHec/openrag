@@ -4,6 +4,7 @@ import type { Connector } from "../queries/useGetConnectorsQuery";
 
 interface ConnectResponse {
   connection_id: string;
+  public_return_url?: string;
   oauth_config?: {
     authorization_endpoint: string;
     client_id: string;
@@ -68,6 +69,9 @@ export const useConnectConnectorMutation = () => {
         localStorage.setItem("connecting_connector_type", connector.type);
         localStorage.setItem("auth_purpose", "data_source");
 
+        const returnUrl = result.public_return_url || window.location.origin;
+        const state = `id=${result.connection_id}&return=${encodeURIComponent(returnUrl)}`;
+
         const authUrl =
           `${result.oauth_config.authorization_endpoint}?` +
           `client_id=${result.oauth_config.client_id}&` +
@@ -78,7 +82,7 @@ export const useConnectConnectorMutation = () => {
           )}&` +
           `access_type=offline&` +
           `prompt=select_account&` +
-          `state=${result.connection_id}`;
+          `state=${encodeURIComponent(state)}`;
 
         window.location.href = authUrl;
       }

@@ -99,7 +99,9 @@ class GoogleDriveOAuth:
             async with aiofiles.open(self.token_file, "w") as f:
                 await f.write(json.dumps(token_data, indent=2))
 
-    def create_authorization_url(self, redirect_uri: str) -> str:
+    def create_authorization_url(
+        self, redirect_uri: str, state: Optional[str] = None
+    ) -> str:
         """Create authorization URL for OAuth flow"""
         # Create flow from client credentials directly
         client_config = {
@@ -115,11 +117,15 @@ class GoogleDriveOAuth:
             client_config, scopes=self.SCOPES, redirect_uri=redirect_uri
         )
 
-        auth_url, _ = flow.authorization_url(
-            access_type="offline",
-            include_granted_scopes="true",
-            prompt="consent",  # Force consent to get refresh token
-        )
+        kwargs = {
+            "access_type": "offline",
+            "include_granted_scopes": "true",
+            "prompt": "consent",  # Force consent to get refresh token
+        }
+        if state:
+            kwargs["state"] = state
+
+        auth_url, _ = flow.authorization_url(**kwargs)
 
         # Store flow state for later use
         self._flow_state = flow.state

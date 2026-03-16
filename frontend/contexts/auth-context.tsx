@@ -125,6 +125,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             ),
           });
 
+          const returnUrl = result.public_return_url || window.location.origin;
+          const state = `id=${result.connection_id}&return=${encodeURIComponent(returnUrl)}`;
+
           const authUrl =
             `${result.oauth_config.authorization_endpoint}?` +
             `client_id=${result.oauth_config.client_id}&` +
@@ -133,7 +136,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             `redirect_uri=${encodeURIComponent(result.oauth_config.redirect_uri)}&` +
             `access_type=offline&` +
             `prompt=select_account&` +
-            `state=${result.connection_id}`;
+            `state=${encodeURIComponent(state)}`;
 
           console.log("Redirecting to OAuth URL:", authUrl);
           window.location.href = authUrl;
