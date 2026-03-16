@@ -378,11 +378,23 @@ def generate_jwt_keys():
         try:
             if os.access(private_key_path, os.W_OK):
                 os.chmod(private_key_path, 0o600)
+                logger.info("RSA private already exists. Successfully ensured the private key permission.")
+            else:
+                logger.warning("Failed to set permissions on RSA private key: Private key is not writable.",
+                    error=str(e),
+                    private_key_path=private_key_path,
+                )
+
             if os.access(public_key_path, os.W_OK):
                 os.chmod(public_key_path, 0o644)
-            logger.info("RSA keys already exist, ensured correct permissions")
+                logger.info("RSA public already exist. Successfully ensured the public key permission.")
+            else:
+                logger.warning("Failed to set permissions on RSA private key: Private key is not writable.",
+                    error=str(e),
+                    public_key_path=public_key_path,
+                )
         except OSError as e:
-            logger.warning("Failed to set permissions on existing keys", error=str(e))
+            logger.warning("Failed to set permissions on existing RSA keys.", error=str(e))
 
 
 def _get_documents_dir():

@@ -370,7 +370,10 @@ ensure-rsa-keys: ## Generate RSA keys for JWT signing if absent, or fix permissi
 	fi
 	@if [ ! -f keys/private_key.pem ]; then \
 		echo "$(YELLOW)Generating RSA keys for JWT signing...$(NC)"; \
-		uv run python -c "from src.main import generate_jwt_keys; generate_jwt_keys()"; \
+		openssl genrsa -out keys/private_key.pem 2048; \
+		openssl rsa -in keys/private_key.pem -pubout -out keys/public_key.pem; \
+		chmod 600 keys/private_key.pem; \
+		chmod 644 keys/public_key.pem; \
 		echo "$(PURPLE)RSA keys for JWT signing generated.$(NC)"; \
 	else \
 		echo "$(CYAN)RSA keys already exist, ensuring correct permissions...$(NC)"; \
