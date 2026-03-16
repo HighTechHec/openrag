@@ -26,7 +26,7 @@ def decode_ibm_jwt(token: str) -> dict | None:
     """
     try:
         return jwt.decode(token, options={"verify_signature": False})
-    except jwt.DecodeError as exc:
+    except jwt.InvalidTokenError as exc:
         logger.warning("IBM JWT decode failed", error=str(exc))
         return None
 
