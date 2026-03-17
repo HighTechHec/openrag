@@ -767,6 +767,7 @@ test-ci: ## Start infra, run integration + SDK tests, tear down (uses DockerHub 
 		curl -s http://localhost:3000/ >/dev/null 2>&1 && break || sleep 2; \
 	done; \
 	echo "$(PURPLE)Running Python SDK integration tests$(NC)"; \
+	uv pip install -e sdks/python; \
 	SDK_TESTS_ONLY=true OPENRAG_URL=http://localhost:3000 uv run pytest tests/integration/test_sdk.py -vv -s || TEST_RESULT=1; \
 	echo "$(PURPLE)Running TypeScript SDK integration tests$(NC)"; \
 	cd sdks/typescript && \
@@ -880,6 +881,7 @@ test-ci-local: ## Same as test-ci but builds all images locally
 		curl -s http://localhost:3000/ >/dev/null 2>&1 && break || sleep 2; \
 	done; \
 	echo "$(PURPLE)Running Python SDK integration tests$(NC)"; \
+	uv pip install -e sdks/python; \
 	SDK_TESTS_ONLY=true OPENRAG_URL=http://localhost:3000 uv run pytest tests/integration/test_sdk.py -vv -s || TEST_RESULT=1; \
 	echo "$(PURPLE)Running TypeScript SDK integration tests$(NC)"; \
 	cd sdks/typescript && \
@@ -912,6 +914,7 @@ test-sdk: ## Run SDK integration tests (requires running OpenRAG at localhost:30
 	@echo "$(CYAN)Make sure OpenRAG is running at localhost:3000 (make dev)$(NC)"
 	@echo ""
 	@echo "$(PURPLE)Running Python SDK tests...$(NC)"
+	uv pip install -e sdks/python
 	SDK_TESTS_ONLY=true OPENRAG_URL=http://localhost:3000 uv run pytest tests/integration/test_sdk.py -vv -s
 	@echo ""
 	@echo "$(PURPLE)Running TypeScript SDK tests...$(NC)"
