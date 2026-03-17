@@ -4,10 +4,12 @@ import { Bell } from "lucide-react";
 import { BrandSwitcher } from "@/components/brand-switcher";
 import Logo from "@/components/icons/openrag-logo";
 import { UserNav } from "@/components/user-nav";
+import { useIsCloudBrand } from "@/contexts/brand-context";
 import { useTask } from "@/contexts/task-context";
 import { cn } from "@/lib/utils";
 
 export function Header() {
+  const isCloudBrand = useIsCloudBrand();
   const { tasks, toggleMenu } = useTask();
 
   // Calculate active tasks for the bell icon
@@ -57,7 +59,12 @@ export function Header() {
             data-testid="task-menu-toggle"
             className="relative h-8 w-8 hover:bg-muted rounded-lg flex items-center justify-center"
           >
-            <Bell size={16} className="text-muted-foreground" />
+            <Bell
+              size={16}
+              className={
+                isCloudBrand ? "text-foreground" : "text-muted-foreground"
+              }
+            />
             {activeTasks.length > 0 && <div className="header-notifications" />}
           </button>
 

@@ -1,9 +1,17 @@
 interface DogIconProps extends React.SVGProps<SVGSVGElement> {
   disabled?: boolean;
+  disabledFill?: string;
 }
 
-const DogIcon = ({ disabled = false, stroke, ...props }: DogIconProps) => {
-  const fillColor = disabled ? "#71717A" : stroke || "#773EFF";
+const DogIcon = ({
+  disabled = false,
+  disabledFill,
+  stroke,
+  ...props
+}: DogIconProps) => {
+  const fillColor = disabled
+    ? (disabledFill ?? "#71717A")
+    : stroke || "#773EFF";
 
   // CSS for the stepped animation states
   const animationCSS = `
