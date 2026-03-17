@@ -115,14 +115,26 @@ async def auth_logout(
 
     await TelemetryClient.send_event(Category.AUTHENTICATION, MessageId.ORB_AUTH_LOGOUT)
 
-    response = JSONResponse(
-        {"status": "logged_out", "message": "Successfully logged out"}
-    )
-
     if IBM_AUTH_ENABLED:
+        # Best-effort: clear cookies from the browser, but warn that the
+        # server-side AMS session is NOT terminated. The IBM session cookie
+        # is owned by Traefik/AMS — it may be re-injected on the next
+        # proxied request if AMS still considers the session active.
+        response = JSONResponse(
+            {
+                "status": "partial_logout",
+                "message": "Browser cookies cleared, but the IBM session is "
+                "managed by the identity provider and may still be active. "
+                "Please log out through IBM Watsonx Data for full session termination.",
+            }
+        )
         response.delete_cookie(key=IBM_SESSION_COOKIE_NAME, httponly=True, samesite="lax")
         response.delete_cookie(key="ibm-auth-basic", httponly=True, samesite="lax")
         return response
+
+    response = JSONResponse(
+        {"status": "logged_out", "message": "Successfully logged out"}
+    )
 
     # Clear the auth cookie
     response.delete_cookie(
@@ -153,6 +165,7 @@ async def ibm_login(request: Request):
     if not request.cookies.get(IBM_SESSION_COOKIE_NAME):
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Basic "):
+            # secure =True not needed for local development
             response.set_cookie(
                 "ibm-auth-basic",
                 auth_header,
