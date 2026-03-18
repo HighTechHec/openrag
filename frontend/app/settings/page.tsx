@@ -9,7 +9,6 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -357,13 +356,6 @@ function KnowledgeSourcesPage() {
     const numValue = Math.max(0, parseInt(value) || 0);
     setChunkSize(numValue);
     debouncedUpdate({ chunk_size: numValue });
-  };
-
-  // Update chunk overlap setting with debounce
-  const handleChunkOverlapChange = (value: string) => {
-    const numValue = Math.max(0, parseInt(value) || 0);
-    setChunkOverlap(numValue);
-    debouncedUpdate({ chunk_overlap: numValue });
   };
 
   // Update docling settings
@@ -898,97 +890,48 @@ function KnowledgeSourcesPage() {
                 />
               </LabelWrapper>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <LabelWrapper id="chunk-size" label="Chunk size">
-                  <div className="relative [&:has(input:hover):not(:has(input:focus))_button]:border-muted-foreground [&:has(input:focus)_button]:border-foreground">
-                    <Input
-                      id="chunk-size"
-                      type="number"
-                      min="1"
-                      value={chunkSize}
-                      onChange={(e) => handleChunkSizeChange(e.target.value)}
-                      className="w-full pr-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center">
-                      <span className="text-sm text-placeholder-foreground mr-4 pointer-events-none">
-                        characters
-                      </span>
-                      <div className="flex flex-col">
-                        <Button
-                          aria-label="Increase value"
-                          className="h-5 rounded-l-none rounded-br-none border-input border-b-[0.5px] focus-visible:relative transition-colors"
-                          variant="outline"
-                          size="iconSm"
-                          onClick={() =>
-                            handleChunkSizeChange((chunkSize + 1).toString())
-                          }
-                        >
-                          <Plus className="text-muted-foreground" size={8} />
-                        </Button>
-                        <Button
-                          aria-label="Decrease value"
-                          className="h-5 rounded-l-none rounded-tr-none border-input border-t-[0.5px] focus-visible:relative transition-colors"
-                          variant="outline"
-                          size="iconSm"
-                          onClick={() =>
-                            handleChunkSizeChange((chunkSize - 1).toString())
-                          }
-                        >
-                          <Minus className="text-muted-foreground" size={8} />
-                        </Button>
-                      </div>
+            <div className="space-y-2">
+              <LabelWrapper id="chunk-size" label="Max Chunk Size">
+                <div className="relative [&:has(input:hover):not(:has(input:focus))_button]:border-muted-foreground [&:has(input:focus)_button]:border-foreground">
+                  <Input
+                    id="chunk-size"
+                    type="number"
+                    min="1"
+                    value={chunkSize}
+                    onChange={(e) => handleChunkSizeChange(e.target.value)}
+                    className="w-full pr-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center">
+                    <span className="text-sm text-placeholder-foreground mr-4 pointer-events-none">
+                      characters
+                    </span>
+                    <div className="flex flex-col">
+                      <Button
+                        aria-label="Increase value"
+                        className="h-5 rounded-l-none rounded-br-none border-input border-b-[0.5px] focus-visible:relative transition-colors"
+                        variant="outline"
+                        size="iconSm"
+                        onClick={() =>
+                          handleChunkSizeChange((chunkSize + 1).toString())
+                        }
+                      >
+                        <Plus className="text-muted-foreground" size={8} />
+                      </Button>
+                      <Button
+                        aria-label="Decrease value"
+                        className="h-5 rounded-l-none rounded-tr-none border-input border-t-[0.5px] focus-visible:relative transition-colors"
+                        variant="outline"
+                        size="iconSm"
+                        onClick={() =>
+                          handleChunkSizeChange((chunkSize - 1).toString())
+                        }
+                      >
+                        <Minus className="text-muted-foreground" size={8} />
+                      </Button>
                     </div>
                   </div>
-                </LabelWrapper>
-              </div>
-              <div className="space-y-2">
-                <LabelWrapper id="chunk-overlap" label="Chunk overlap">
-                  <div className="relative [&:has(input:hover):not(:has(input:focus))_button]:border-muted-foreground [&:has(input:focus)_button]:border-foreground">
-                    <Input
-                      id="chunk-overlap"
-                      type="number"
-                      min="0"
-                      value={chunkOverlap}
-                      onChange={(e) => handleChunkOverlapChange(e.target.value)}
-                      className="w-full pr-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center">
-                      <span className="text-sm text-placeholder-foreground mr-4 pointer-events-none">
-                        characters
-                      </span>
-                      <div className="flex flex-col">
-                        <Button
-                          aria-label="Increase value"
-                          className="h-5 rounded-l-none rounded-br-none border-input border-b-[0.5px] focus-visible:relative transition-colors"
-                          variant="outline"
-                          size="iconSm"
-                          onClick={() =>
-                            handleChunkOverlapChange(
-                              (chunkOverlap + 1).toString(),
-                            )
-                          }
-                        >
-                          <Plus className="text-muted-foreground" size={8} />
-                        </Button>
-                        <Button
-                          aria-label="Decrease value"
-                          className="h-5 rounded-l-none rounded-tr-none border-input border-t-[0.5px] focus-visible:relative transition-colors"
-                          variant="outline"
-                          size="iconSm"
-                          onClick={() =>
-                            handleChunkOverlapChange(
-                              (chunkOverlap - 1).toString(),
-                            )
-                          }
-                        >
-                          <Minus className="text-muted-foreground" size={8} />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </LabelWrapper>
-              </div>
+                </div>
+              </LabelWrapper>
             </div>
             <div className="">
               <div className="flex items-center justify-between py-3 border-b border-border">

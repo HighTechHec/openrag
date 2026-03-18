@@ -179,20 +179,9 @@ export const IngestSettings = ({
             <div className="w-full">
               <NumberInput
                 id="chunk-size"
-                label="Chunk size"
+                label="Max Chunk Size"
                 value={currentSettings.chunkSize}
                 onChange={(value) => handleSettingsChange({ chunkSize: value })}
-                unit="characters"
-              />
-            </div>
-            <div className="w-full">
-              <NumberInput
-                id="chunk-overlap"
-                label="Chunk overlap"
-                value={currentSettings.chunkOverlap}
-                onChange={(value) =>
-                  handleSettingsChange({ chunkOverlap: value })
-                }
                 unit="characters"
               />
             </div>
