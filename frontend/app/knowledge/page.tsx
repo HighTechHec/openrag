@@ -9,7 +9,7 @@ import {
   type ValueFormatterParams,
 } from "ag-grid-community";
 import { AgGridReact, type CustomCellRendererProps } from "ag-grid-react";
-import { Cloud, FileIcon, Globe, RefreshCw } from "lucide-react";
+import { Cloud, FileIcon, Globe, Heading4, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { KnowledgeDropdown } from "@/components/knowledge-dropdown";
@@ -29,7 +29,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsCloudBrand } from "@/contexts/brand-context";
 import { parseTimestampMs } from "@/lib/time-utils";
+import { cn } from "@/lib/utils";
 import {
   DeleteConfirmationDialog,
   formatFilesToDelete,
@@ -43,6 +45,7 @@ import SharePointIcon from "../../components/icons/share-point-logo";
 import { useDeleteDocument } from "../api/mutations/useDeleteDocument";
 import { useRefreshOpenragDocs } from "../api/mutations/useRefreshOpenragDocs";
 import { useSyncAllConnectors } from "../api/mutations/useSyncConnector";
+import { ibmSettingsFont } from "../settings/page";
 
 // Function to get the appropriate icon for a connector type
 function getSourceIcon(connectorType?: string) {
@@ -74,6 +77,7 @@ function getSourceIcon(connectorType?: string) {
 }
 
 function SearchPage() {
+  const isCloudBrand = useIsCloudBrand();
   const queryClient = useQueryClient();
   const router = useRouter();
   const {
@@ -591,7 +595,14 @@ function SearchPage() {
     <>
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">Project knowledge</h2>
+          <h4
+            className={cn(
+              "text-lg font-semibold",
+              isCloudBrand && "ibm-section-title",
+            )}
+          >
+            Project knowledge
+          </h4>
         </div>
 
         {/* Search Input Area */}

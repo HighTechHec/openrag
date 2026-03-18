@@ -268,6 +268,32 @@
     --layered-select-bg: rgba(131, 131, 131, 0.24);
     --chat-input-border: #262626;
     --icon-disabled: #525252;
+    --layer-contextual: 0 0% 15%;
+    --layer-contextual-foreground: 0 0% 95.7%;
+    --text-text-01: 0 0% 95.7%;
+    --link-primary: 217 100% 74%;
+    --button-tertiary: 217 100% 74%;
+  }
+
+  /* IBM Settings: section titles (productive heading-04); beats CardTitle utilities */
+  [data-theme="ibm"] .ibm-section-title {
+    color: hsl(var(--text-text-01));
+    font-family: inherit;
+    font-size: 28px !important;
+    font-weight: 400 !important;
+    line-height: 36px !important;
+    font-style: normal;
+    letter-spacing: 0;
+  }
+
+  /* IBM Settings: inline links (Link/link-primary) */
+  [data-theme="ibm"] .ibm-settings-page a[href] {
+    color: hsl(var(--link-primary));
+  }
+
+  [data-theme="ibm"] .ibm-settings-page a[href]:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   /* IBM chat nudges / quick actions */
