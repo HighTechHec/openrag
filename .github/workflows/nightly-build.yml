@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+          ref: ${{ secrets.NIGHTLY_BRANCH || 'main' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,12 +46,17 @@ jobs:
           TAG="$BASE_TAG"
           # If the tag already exists on the remote, resolve collision using .devN suffixes (PEP 440 compliant)
           if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
-            echo "Base tag '$TAG' already exists on remote. Searching for available .devN suffix..."
+            echo "Base tag '$TAG' already exists on remote. Searching for available dev suffix..."
+            # Extract the prefix (e.g., v0.3.2) and the current dev number (e.g., 5)
+            VERSION_PREFIX=$(echo "$BASE_TAG" | sed -E 's/\.dev[0-9]+$//')
+            START_DEV=$(echo "$BASE_TAG" | sed -E 's/.*\.dev([0-9]+)$/\1/')
+            
             MAX_DEV=20
             FOUND=0
             i=1
             while [ "$i" -le "$MAX_DEV" ]; do
-              CANDIDATE="${BASE_TAG}.dev${i}"
+              NEXT_DEV=$((START_DEV + i))
+              CANDIDATE="${VERSION_PREFIX}.dev${NEXT_DEV}"
               if ! git ls-remote --exit-code --tags origin "$CANDIDATE" >/dev/null 2>&1; then
                 TAG="$CANDIDATE"
                 FOUND=1
@@ -59,7 +65,7 @@ jobs:
               i=$((i + 1))
             done
             if [ "$FOUND" -ne 1 ]; then
-              echo "Error: Unable to find an available .devN tag for base tag '$BASE_TAG' after checking ${MAX_DEV} candidates." >&2
+              echo "Error: Unable to find an available dev tag for base tag '$BASE_TAG' after checking ${MAX_DEV} candidates." >&2
               exit 1
             fi
           fi
@@ -212,6 +218,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ secrets.NIGHTLY_BRANCH || 'main' }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
