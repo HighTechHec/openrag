@@ -83,31 +83,42 @@ function AuthCallbackContent() {
         // Send callback data to backend
         const stateParam = searchParams.get("state");
         let parsedConnectionId = finalConnectorId;
-        let stateReturnUrl = null;
+        let stateReturnUrl: string | null = null;
 
-        if (stateParam && stateParam.includes("id=")) {
+        if (stateParam) {
           try {
-            const params = new URLSearchParams(stateParam);
-            parsedConnectionId = params.get("id") || finalConnectorId;
-            const b64Return = params.get("return");
-            if (b64Return) {
+            // The entire state is now Base64 encoded: id=<connection_id>&return=<return_url>
+            const decodedState = decodeBase64(stateParam);
+            const params = new URLSearchParams(decodedState);
+
+            if (params.has("id")) {
+              parsedConnectionId = params.get("id") || finalConnectorId;
+              stateReturnUrl = params.get("return");
+              console.log("Parsed Base64 state parameter:", {
+                parsedConnectionId,
+                stateReturnUrl,
+              });
+            } else if (stateParam.includes("id=")) {
+              // Fallback: If not base64 but contains id=, try to parse as raw for backward compatibility
+              const rawParams = new URLSearchParams(stateParam);
+              parsedConnectionId = rawParams.get("id") || finalConnectorId;
+              stateReturnUrl = rawParams.get("return");
+            }
+          } catch (e) {
+            console.error(
+              "Failed to Base64 decode or parse state parameter",
+              e,
+            );
+            // Fallback: If decoding fails, try to parse as raw if it contains id=
+            if (stateParam.includes("id=")) {
               try {
-                stateReturnUrl = decodeBase64(b64Return);
-              } catch (e) {
-                console.error(
-                  "Failed to Base64 decode return URL:",
-                  b64Return,
-                  e,
-                );
-                stateReturnUrl = b64Return; // Fallback to raw if decoding fails
+                const params = new URLSearchParams(stateParam);
+                parsedConnectionId = params.get("id") || finalConnectorId;
+                stateReturnUrl = params.get("return");
+              } catch (innerE) {
+                console.error("Failed to parse raw state parameter", innerE);
               }
             }
-            console.log("Parsed state parameter:", {
-              parsedConnectionId,
-              stateReturnUrl,
-            });
-          } catch (e) {
-            console.error("Failed to parse state parameter", e);
           }
         }
 

@@ -71,8 +71,8 @@ export const useConnectConnectorMutation = () => {
         localStorage.setItem("auth_purpose", "data_source");
 
         const returnUrl = result.public_return_url || window.location.origin;
-        const encodedReturnUrl = encodeBase64(returnUrl);
-        const state = `id=${result.connection_id}&return=${encodedReturnUrl}`;
+        const stateQuery = `id=${result.connection_id}&return=${returnUrl}`;
+        const state = encodeBase64(stateQuery);
 
         const authUrl =
           `${result.oauth_config.authorization_endpoint}?` +
