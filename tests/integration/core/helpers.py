@@ -115,3 +115,15 @@ async def is_docling_available() -> bool:
             return r.status_code == 200
     except Exception:
         return False
+
+
+async def is_langflow_available() -> bool:
+    """Returns True if Langflow is reachable at LANGFLOW_URL."""
+    try:
+        import os
+        langflow_url = os.getenv("LANGFLOW_URL", "http://localhost:7860")
+        async with httpx.AsyncClient() as c:
+            r = await c.get(f"{langflow_url}/health", timeout=5.0)
+            return r.status_code == 200
+    except Exception:
+        return False

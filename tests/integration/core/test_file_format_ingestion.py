@@ -1,19 +1,25 @@
 """
 Integration tests for file format support in OpenRAG.
 
+Uses the production ingestion path (DISABLE_INGEST_WITH_LANGFLOW=false) — all
+uploads go through the Langflow pipeline, exactly as they do in production.
+
 Parametrized across all non-multimedia formats supported by docling:
-  - Markdown, plain text  → bypass docling (always runnable)
-  - HTML, XHTML, CSV, AsciiDoc, LaTeX → text formats requiring docling-serve
-  - PDF, DOCX, XLSX, PPTX            → binary formats requiring docling-serve
+  - Markdown, plain text  → bypass docling (always runnable via Langflow)
+  - HTML, XHTML, CSV, AsciiDoc, LaTeX → text formats (Langflow → docling-serve)
+  - PDF, DOCX, XLSX, PPTX            → binary formats (Langflow → docling-serve)
 
 Each parametrized test case:
-  1. Uploads the sample file via /router/upload_ingest
-  2. Waits for indexing confirmation via /search
-  3. Asserts content was indexed (pass = format supported, skip = docling unavailable)
+  1. Uploads the sample file via /router/upload_ingest (Langflow path → 202 + task_id)
+  2. Polls GET /tasks/{task_id} until completed
+  3. Polls /search to confirm content was indexed
+
+Skip conditions:
+  - Langflow not running → entire test is skipped
+  - docling-serve not running + format requires docling → test is skipped
 
 This test file serves as a living format-support report. Run with -v to see
-per-format results. "SKIPPED" means docling-serve was not running, not that
-the format is unsupported.
+per-format results.
 
 Binary sample files are pre-generated in tests/data/samples/ by running:
   python tests/data/create_samples.py
@@ -27,6 +33,7 @@ from tests.integration.core.helpers import (
     boot_app,
     wait_for_task_completion,
     is_docling_available,
+    is_langflow_available,
 )
 
 # Path to pre-generated binary sample files
@@ -77,17 +84,24 @@ def _fmt_ids():
 @pytest.mark.parametrize("fmt,ext,content,req_docling", _FORMAT_CASES, ids=_fmt_ids())
 async def test_ingest_format(tmp_path, fmt, ext, content, req_docling):
     """
-    Upload a file of format 'fmt' and assert it is indexed and searchable.
+    Upload a file of format 'fmt' through the production Langflow ingestion pipeline
+    and assert it is indexed and searchable.
 
+    SKIPPED when Langflow is not running (all formats).
     SKIPPED when docling-serve is not running and the format requires it.
     PASSED when the file is successfully ingested and appears in search results.
     FAILED when the upload or indexing step errors unexpectedly.
     """
-    # Skip docling-dependent tests when docling-serve is unavailable
+    # Production path requires Langflow — skip entire test if it's not running
+    if not await is_langflow_available():
+        pytest.skip("Langflow not running — skipping format ingestion test")
+
+    # Skip docling-dependent formats when docling-serve is unavailable
     if req_docling and not await is_docling_available():
         pytest.skip(f"docling-serve not running — skipping {fmt} format test")
 
-    app, client = await boot_app()
+    # Boot app with production ingestion path (Langflow enabled)
+    app, client = await boot_app(disable_langflow_ingest=False)
     try:
         # Prepare file bytes
         filename = f"sample_openrag_{fmt}{ext}"
@@ -100,28 +114,24 @@ async def test_ingest_format(tmp_path, fmt, ext, content, req_docling):
         else:
             file_bytes = content.encode("utf-8")
 
-        # Upload
+        # Upload via production route — Langflow path always returns 202 + task_id
         files = {"file": (filename, file_bytes, "application/octet-stream")}
         upload_resp = await client.post("/router/upload_ingest", files=files)
-        assert upload_resp.status_code in (201, 202), (
+        assert upload_resp.status_code == 202, (
             f"{fmt}: Upload failed with {upload_resp.status_code}: {upload_resp.text}"
         )
 
         body = upload_resp.json()
+        task_id = body.get("task_id")
+        assert task_id, f"{fmt}: 202 response missing task_id: {body}"
 
-        # Handle async task response (202) vs synchronous (201)
-        if upload_resp.status_code == 202 and "task_id" in body:
-            task = await wait_for_task_completion(client, body["task_id"], timeout_s=120)
-            assert task["status"] == "completed", (
-                f"{fmt}: Task did not complete successfully: {task}"
-            )
-        else:
-            assert body.get("status") in ("indexed", "unchanged"), (
-                f"{fmt}: Unexpected upload status: {body}"
-            )
+        # Poll task until completion (allow generous timeout for docling processing)
+        task = await wait_for_task_completion(client, task_id, timeout_s=180)
+        assert task["status"] == "completed", (
+            f"{fmt}: Task did not complete successfully: {task}"
+        )
 
-        # For text-based formats, verify content appears in search results.
-        # Binary formats may extract different text so we just verify indexing occurred.
+        # Verify content appears in search results
         search_query = f"OpenRAG {fmt} format"
         deadline = asyncio.get_event_loop().time() + 30
         found = False
@@ -138,15 +148,10 @@ async def test_ingest_format(tmp_path, fmt, ext, content, req_docling):
             last_resp = search_resp
             await asyncio.sleep(1)
 
-        # For binary formats (PDF/DOCX/XLSX/PPTX), accept that content may not
-        # be discoverable via keyword search if embeddings aren't available —
-        # the upload success (no 5xx) is the primary assertion.
+        # For binary formats (PDF/DOCX/XLSX/PPTX), text extraction quality depends
+        # on docling — accept task completion as sufficient proof of ingestion.
         if not found and isinstance(content, Path):
-            # Binary format: verify the upload response at minimum
-            assert upload_resp.status_code in (201, 202), (
-                f"{fmt}: Upload succeeded but content not found in search within 30s. "
-                f"Last search response: {last_resp.text if last_resp else 'none'}"
-            )
+            pass  # Task completed = file was processed; search miss is acceptable
         else:
             assert found, (
                 f"{fmt}: Content not found in search within 30s. "
@@ -154,7 +159,7 @@ async def test_ingest_format(tmp_path, fmt, ext, content, req_docling):
                 f"Last search response: {last_resp.text if last_resp else 'none'}"
             )
 
-        print(f"\n✓ {fmt.upper()}: ingested {filename} ({len(file_bytes)} bytes)")
+        print(f"\n✓ {fmt.upper()}: ingested {filename} ({len(file_bytes)} bytes) via Langflow")
 
     finally:
         await client.aclose()
