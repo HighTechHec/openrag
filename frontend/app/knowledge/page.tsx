@@ -511,11 +511,193 @@ function SearchPage() {
     },
   ];
 
+  const columnDefsNew: ColDef<File>[] = [
+    {
+      field: "filename",
+      headerName: "Source",
+      checkboxSelection: (params: CheckboxSelectionCallbackParams<File>) =>
+        (params?.data?.status || "active") === "active",
+      headerCheckboxSelection: true,
+      flex: 2.2,
+      minWidth: 260,
+      cellRenderer: ({ data, value }: CustomCellRendererProps<File>) => {
+        const status = data?.status || "active";
+        const isActive = status === "active";
+        const showOpenragSourceAnimation =
+          isOpenragDocsRow(data) && hasOpenragRefreshCue;
+
+        return (
+          <div className="flex items-center overflow-hidden w-full">
+            <button
+              type="button"
+              className={cn(
+                "flex items-center gap-2 text-left flex-1 overflow-hidden transition-colors",
+                isActive
+                  ? "cursor-pointer hover:text-primary"
+                  : "cursor-default",
+              )}
+              onClick={() => {
+                if (!isActive) return;
+                router.push(
+                  `/knowledge/chunks?filename=${encodeURIComponent(
+                    data?.filename ?? "",
+                  )}`,
+                );
+              }}
+            >
+              {getSourceIcon(data?.connector_type)}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "truncate font-medium",
+                      showOpenragSourceAnimation
+                        ? "text-primary animate-pulse"
+                        : "text-foreground",
+                    )}
+                  >
+                    {value}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start">
+                  {value}
+                </TooltipContent>
+              </Tooltip>
+            </button>
+          </div>
+        );
+      },
+    },
+    {
+      field: "size",
+      headerName: "Size",
+      flex: 1,
+      minWidth: 110,
+      valueFormatter: (params: ValueFormatterParams<File>) =>
+        params.value ? `${Math.round(params.value / 1024)} KB` : "-",
+      cellClass: "text-muted-foreground",
+    },
+    {
+      field: "mimetype",
+      headerName: "Type",
+      flex: 1,
+      minWidth: 110,
+      cellClass: "text-muted-foreground",
+    },
+    {
+      field: "owner",
+      headerName: "Owner",
+      flex: 1.4,
+      minWidth: 180,
+      valueFormatter: (params: ValueFormatterParams<File>) =>
+        params.data?.owner_name || params.data?.owner_email || "—",
+      cellClass: "text-muted-foreground",
+    },
+    {
+      field: "chunkCount",
+      headerName: "Chunks",
+      flex: 0.9,
+      minWidth: 95,
+      valueFormatter: (params: ValueFormatterParams<File>) =>
+        params.data?.chunkCount?.toString() || "-",
+      cellClass: "text-muted-foreground",
+    },
+    {
+      field: "avgScore",
+      headerName: "Avg score",
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: (params: ValueFormatterParams<File>) =>
+        typeof params.value === "number" ? params.value.toString() : "-",
+      cellClass: "text-muted-foreground",
+    },
+    {
+      field: "status",
+      headerName: "Status",
+      flex: 1,
+      minWidth: 130,
+      cellRenderer: ({ data }: CustomCellRendererProps<File>) => {
+        const status = data?.status || "active";
+        const showOpenragRefreshCue =
+          isOpenragDocsRow(data) && hasOpenragRefreshCue;
+
+        if (showOpenragRefreshCue) {
+          return (
+            <div className="inline-flex items-center gap-2 text-primary">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium">Refreshing</span>
+            </div>
+          );
+        }
+
+        if (status === "failed") {
+          return (
+            <button
+              type="button"
+              className="inline-flex items-center h-full text-destructive transition hover:opacity-80"
+              aria-label="View ingestion error"
+              data-testid="failed-status-cell-trigger"
+              onClick={() => {
+                selectTask(getTaskIdForRow(data));
+                openMenu();
+                setRecentTasksExpanded(true);
+              }}
+            >
+              <StatusBadge status={status} className="pointer-events-none" />
+            </button>
+          );
+        }
+
+        return <StatusBadge status={status} />;
+      },
+    },
+    {
+      colId: "actions",
+      headerName: "",
+      width: 56,
+      minWidth: 56,
+      maxWidth: 56,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      suppressMovable: true,
+      cellRenderer: ({ data }: CustomCellRendererProps<File>) => {
+        const status = data?.status || "active";
+        if (status !== "active") return null;
+
+        return (
+          <KnowledgeActionsDropdown
+            filename={data?.filename || ""}
+            connectorType={data?.connector_type}
+          />
+        );
+      },
+      cellStyle: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+      },
+    },
+  ];
+
   const defaultColDef: ColDef<File> = {
     resizable: false,
     suppressMovable: true,
     initialFlex: 1,
     minWidth: 100,
+  };
+
+  const defaultColDefNew: ColDef<File> = {
+    resizable: false,
+    suppressMovable: true,
+    sortable: false,
+    initialFlex: 1,
+    minWidth: 100,
+    cellStyle: {
+      display: "flex",
+      alignItems: "center",
+    },
   };
 
   const onSelectionChanged = useCallback(() => {
@@ -696,36 +878,69 @@ function SearchPage() {
             </div>
           </div>
         )}
-        <AgGridReact
-          className="w-full overflow-auto"
-          columnDefs={columnDefs as ColDef<File>[]}
-          defaultColDef={defaultColDef}
-          loading={isFetching}
-          ref={gridRef}
-          theme={themeQuartz.withParams({ browserColorScheme: "inherit" })}
-          rowData={gridRows}
-          rowSelection="multiple"
-          rowMultiSelectWithClick={false}
-          suppressRowClickSelection={true}
-          getRowId={(params: GetRowIdParams<File>) =>
-            getFileIdentity(params.data)
-          }
-          domLayout="normal"
-          onSelectionChanged={onSelectionChanged}
-          pagination={pagination}
-          paginationPageSize={paginationPageSize}
-          paginationPageSizeSelector={paginationPageSizeSelector}
-          noRowsOverlayComponent={() => (
-            <div className="text-center pb-[45px]">
-              <div className="text-lg text-primary font-semibold">
-                No knowledge
+        {isCloudBrand ? (
+          <AgGridReact
+            className="w-full overflow-auto border"
+            columnDefs={columnDefsNew as ColDef<File>[]}
+            defaultColDef={defaultColDefNew}
+            loading={isFetching}
+            ref={gridRef}
+            theme={themeQuartz.withParams({ browserColorScheme: "inherit" })}
+            rowData={gridRows}
+            rowSelection="multiple"
+            getRowId={(params: GetRowIdParams<File>) =>
+              getFileIdentity(params.data)
+            }
+            domLayout="normal"
+            onSelectionChanged={onSelectionChanged}
+            pagination={pagination}
+            paginationPageSize={paginationPageSize}
+            paginationPageSizeSelector={paginationPageSizeSelector}
+            headerHeight={64}
+            rowHeight={64}
+            noRowsOverlayComponent={() => (
+              <div className="text-center pb-[45px]">
+                <div className="text-lg text-primary font-semibold">
+                  No knowledge
+                </div>
+                <div className="text-sm mt-1 text-muted-foreground">
+                  Add files from local or your preferred cloud.
+                </div>
               </div>
-              <div className="text-sm mt-1 text-muted-foreground">
-                Add files from local or your preferred cloud.
+            )}
+          />
+        ) : (
+          <AgGridReact
+            className="w-full overflow-auto"
+            columnDefs={columnDefs as ColDef<File>[]}
+            defaultColDef={defaultColDef}
+            loading={isFetching}
+            ref={gridRef}
+            theme={themeQuartz.withParams({ browserColorScheme: "inherit" })}
+            rowData={gridRows}
+            rowSelection="multiple"
+            rowMultiSelectWithClick={false}
+            suppressRowClickSelection={true}
+            getRowId={(params: GetRowIdParams<File>) =>
+              getFileIdentity(params.data)
+            }
+            domLayout="normal"
+            onSelectionChanged={onSelectionChanged}
+            pagination={pagination}
+            paginationPageSize={paginationPageSize}
+            paginationPageSizeSelector={paginationPageSizeSelector}
+            noRowsOverlayComponent={() => (
+              <div className="text-center pb-[45px]">
+                <div className="text-lg text-primary font-semibold">
+                  No knowledge
+                </div>
+                <div className="text-sm mt-1 text-muted-foreground">
+                  Add files from local or your preferred cloud.
+                </div>
               </div>
-            </div>
-          )}
-        />
+            )}
+          />
+        )}
       </div>
 
       {/* Bulk Delete Confirmation Dialog */}
