@@ -94,10 +94,29 @@ jobs:
           fi
 
       - name: Load Cached Docker Images
+        id: load-cached-docker-images
         if: steps.cache-docker.outputs.cache-hit == 'true' && steps.validate-docker-cache.outputs.valid == 'true'
         run: |
           echo "Loading cached Docker images..."
-          docker load -i ${{ runner.temp }}/docker-cache/images.tar
+          # Free some runner disk before unpacking large layers.
+          docker system prune -af || true
+          docker builder prune -af || true
+
+          if docker load -i ${{ runner.temp }}/docker-cache/images.tar; then
+            echo "loaded=true" >> $GITHUB_OUTPUT
+          else
+            echo "Docker cache load failed (likely disk pressure). Falling back to pull."
+            echo "loaded=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pull Docker Images Fallback
+        if: steps.cache-docker.outputs.cache-hit != 'true' || steps.validate-docker-cache.outputs.valid != 'true' || steps.load-cached-docker-images.outputs.loaded == 'false'
+        run: |
+          echo "Pulling required images..."
+          docker pull langflowai/openrag-opensearch:latest
+          docker pull langflowai/openrag-backend:latest
+          docker pull langflowai/openrag-langflow:latest
+          docker pull opensearchproject/opensearch-dashboards:3.0.0
 
       # Cache Playwright browsers using a composite key
       - name: Cache Playwright Browsers
@@ -121,7 +140,7 @@ jobs:
           ./scripts/setup-e2e.sh
 
       - name: Save Docker Images for Caching
-        if: steps.cache-docker.outputs.cache-hit != 'true' || steps.validate-docker-cache.outputs.valid == 'false'
+        if: steps.cache-docker.outputs.cache-hit != 'true' || steps.validate-docker-cache.outputs.valid == 'false' || steps.load-cached-docker-images.outputs.loaded == 'false'
         run: |
           echo "Saving Docker images to cache..."
           rm -rf ${{ runner.temp }}/docker-cache
