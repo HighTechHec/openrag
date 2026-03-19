@@ -147,7 +147,7 @@ services:
       - WATSONX_PROJECT_ID=${WATSONX_PROJECT_ID}
       - OLLAMA_BASE_URL=${OLLAMA_ENDPOINT}
       - LANGFLOW_CONFIG_DIR=/app/langflow-data
-      - LANGFLOW_DATABASE_URL=sqlite:////app/langflow-data/langflow.db
+      - LANGFLOW_DATABASE_URL=${LANGFLOW_DATABASE_URL:-sqlite:////app/langflow-data/langflow.db}
       - LANGFLOW_SECRET_KEY=${LANGFLOW_SECRET_KEY}
       - JWT=None
       - OWNER=None

@@ -799,7 +799,7 @@ class FlowsService:
             logger.error(f"Error comparing flow {flow_id} with file: {str(e)}")
             return False
 
-    async def ensure_flows_exist(self):
+    async def ensure_flows_exist(self) -> set[str]:
         """
         Ensure all configured flows exist in Langflow.
 
@@ -810,6 +810,8 @@ class FlowsService:
 
         This replaces the LANGFLOW_LOAD_FLOWS_PATH mechanism, which performed a
         blind upsert on every container start and discarded user edits.
+
+        Returns the set of flow type names that were actually created.
         """
         flow_configs = [
             ("nudges", NUDGES_FLOW_ID),
@@ -817,6 +819,7 @@ class FlowsService:
             ("ingest", LANGFLOW_INGEST_FLOW_ID),
             ("url_ingest", LANGFLOW_URL_INGEST_FLOW_ID),
         ]
+        created_flow_types: set[str] = set()
 
         for flow_type, flow_id in flow_configs:
             if not flow_id:
@@ -829,6 +832,13 @@ class FlowsService:
                 if response.status_code == 200:
                     logger.info(
                         f"Flow {flow_type} (ID: {flow_id}) already exists, skipping creation"
+                    )
+                    continue
+
+                if response.status_code != 404:
+                    logger.warning(
+                        f"Unexpected status checking {flow_type} flow (ID: {flow_id}): "
+                        f"HTTP {response.status_code} — skipping creation to avoid overwriting existing data"
                     )
                     continue
 
@@ -849,6 +859,7 @@ class FlowsService:
                     logger.info(
                         f"Created {flow_type} flow (ID: {flow_id}) from {os.path.basename(flow_path)}"
                     )
+                    created_flow_types.add(flow_type)
                 else:
                     logger.warning(
                         f"Failed to create {flow_type} flow (ID: {flow_id}): "
@@ -859,6 +870,8 @@ class FlowsService:
                 logger.error(
                     f"Error ensuring {flow_type} flow (ID: {flow_id}) exists: {e}"
                 )
+
+        return created_flow_types
 
     async def check_flows_reset(self):
         """
