@@ -20,8 +20,6 @@ After changing knowledge ingestion settings, you must determine if you need to r
 It isn't always necessary to reupload documents after changing knowledge ingestion settings.
 For example, it is typical to upload some documents with OCR enabled and others without OCR enabled.
 
-If needed, you can use [filters](/knowledge-filters) to separate documents that you uploaded with different settings, such as different embedding models.
-
 ## Select a Docling implementation {#select-a-docling-implementation}
 
 OpenRAG uses [Docling](https://docling-project.github.io/docling/) for document ingestion.
@@ -63,7 +61,7 @@ If you want to generate new embeddings for existing documents, you must reupload
 
 To remove previously generated embeddings, you must remove the existing documents from the knowledge base.
 
-### Best practices for multiple embedding models
+### Best practices for multiple embedding models {#best-practices-for-multiple-embedding-models}
 
 * **Make sure the active embedding model is correct before ingesting documents**: For ingestion, OpenRAG allows only one active embedding model at a time.
 The active model is set on the <Icon name="Settings2" aria-hidden="true"/> **Settings** page.

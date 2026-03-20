@@ -12,11 +12,10 @@ To apply new instructions, click **Save Agent Instructions**.
    On the **Settings** page, you can add, edit, and remove model providers.
 
    OpenRAG functionality requires at least one language model and one embedding model.
-   If you remove all providers, most OpenRAG functionality will be non-functional until you reconfigure at least one provider.
+   If there are no models available, most OpenRAG functionality will fail until you reconfigure one model of each type.
 
    If you remove providers or models that you previously used for chat or ingestion, you might experience errors or unexpected behaviors.
-   For example, if you remove all embedding models, the chat cannot generate an embedding from your query to retrieve relevant documents from the knowledge base.
-   Similarly, if you change the embedding model, the chat might return incorrect or no results due to differences between the original and new embedding models.
+   For more information, see [Best practices for multiple embedding models](/ingestion-configure#best-practices-for-multiple-embedding-models).
    :::
 
 4. To edit all flow settings and components with full customization capabilities, edit the flow in the Langflow visual editor:
