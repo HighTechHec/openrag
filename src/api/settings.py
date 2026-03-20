@@ -37,6 +37,7 @@ from dependencies import (
 from session_manager import User
 
 logger = get_logger(__name__)
+_background_tasks: set[asyncio.Task] = set()
 
 
 class SettingsUpdateBody(BaseModel):
@@ -821,12 +822,13 @@ async def update_settings(
 
         # Run expensive Langflow sync in the background to keep settings updates responsive.
         if should_validate or provider_updated:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 _run_async_post_save_langflow_updates(
                     session_manager=session_manager,
                     update_mcp_servers=(
                         body.embedding_provider is not None
                         or body.embedding_model is not None
+                        or provider_updated
                     ),
                     update_model_values=(
                         body.llm_provider is not None
@@ -837,6 +839,9 @@ async def update_settings(
                     ),
                 )
             )
+            # Keep a strong reference until completion to avoid premature GC cancellation.
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
 
 
         set_fields = [k for k, v in body.model_dump().items() if v is not None]
