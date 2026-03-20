@@ -41,9 +41,67 @@ def _config(selected_provider: str = "openai"):
     )
 
 
+def _config_single_provider(selected_provider: str = "openai"):
+    provider = selected_provider.lower().strip()
+    return SimpleNamespace(
+        knowledge=SimpleNamespace(
+            embedding_model="text-embedding-3-small",
+            embedding_provider=provider,
+        ),
+        providers=SimpleNamespace(
+            openai=SimpleNamespace(
+                api_key="openai-key" if provider == "openai" else "",
+                configured=provider == "openai",
+            ),
+            anthropic=SimpleNamespace(
+                api_key="anthropic-key" if provider == "anthropic" else "",
+                configured=provider == "anthropic",
+            ),
+            watsonx=SimpleNamespace(
+                api_key="wx-key" if provider == "watsonx" else "",
+                project_id="wx-proj" if provider == "watsonx" else "",
+                endpoint="https://wx",
+                configured=provider == "watsonx",
+            ),
+            ollama=SimpleNamespace(
+                endpoint="http://localhost:11434" if provider == "ollama" else "",
+                configured=provider == "ollama",
+            ),
+        ),
+    )
+
+
 @pytest.mark.asyncio
-async def test_url_ingestion_headers_only_include_selected_provider_credentials():
-    """Selected embedding provider should be the only provider-specific credential sent."""
+async def test_url_ingestion_headers_with_single_selected_provider_only_include_that_provider():
+    service = LangflowFileService(flows_service=None)
+    service.flow_id_url_ingest = "flow-1"
+
+    async def _request(method, path, **kwargs):
+        if method == "GET" and path == "/api/v1/flows/flow-1":
+            return _Resp(status_code=200, payload={"id": "flow-1"})
+        if method == "POST" and path == "/api/v1/run/flow-1":
+            return _Resp(status_code=200, payload={"ok": True})
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    with (
+        patch("services.langflow_file_service.clients.langflow_request", new=AsyncMock(side_effect=_request)) as req_mock,
+        patch("config.settings.get_openrag_config", return_value=_config_single_provider("openai")),
+    ):
+        await service.run_url_ingestion_flow("https://example.com/single", crawl_depth=1)
+
+    post_call = [c for c in req_mock.call_args_list if c.args[:2] == ("POST", "/api/v1/run/flow-1")][0]
+    headers = post_call.kwargs["headers"]
+
+    assert headers["X-LANGFLOW-GLOBAL-VAR-OPENAI_API_KEY"] == "openai-key"
+    assert "X-LANGFLOW-GLOBAL-VAR-ANTHROPIC_API_KEY" not in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_APIKEY" not in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_PROJECT_ID" not in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL" not in headers
+
+
+@pytest.mark.asyncio
+async def test_url_ingestion_headers_include_all_provider_credentials():
+    """URL ingestion should send all configured provider credentials."""
     service = LangflowFileService(flows_service=None)
     service.flow_id_url_ingest = "flow-1"
 
@@ -65,10 +123,43 @@ async def test_url_ingestion_headers_only_include_selected_provider_credentials(
 
     assert headers["X-Langflow-Global-Var-SELECTED_EMBEDDING_MODEL"] == "text-embedding-3-small"
     assert "X-LANGFLOW-GLOBAL-VAR-OPENAI_API_KEY" in headers
-    # Expected provider-agnostic rule: do not send non-selected providers.
-    assert "X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL" not in headers
-    assert "X-LANGFLOW-GLOBAL-VAR-ANTHROPIC_API_KEY" not in headers
-    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_APIKEY" not in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-ANTHROPIC_API_KEY" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_APIKEY" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_PROJECT_ID" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL" in headers
+
+
+@pytest.mark.asyncio
+async def test_url_ingestion_headers_support_mixed_provider_ingested_documents():
+    """
+    Mixed-provider scenario:
+    previously ingested documents may use different embedding providers/models,
+    so runtime headers must include credentials for all providers.
+    """
+    service = LangflowFileService(flows_service=None)
+    service.flow_id_url_ingest = "flow-1"
+
+    async def _request(method, path, **kwargs):
+        if method == "GET" and path == "/api/v1/flows/flow-1":
+            return _Resp(status_code=200, payload={"id": "flow-1"})
+        if method == "POST" and path == "/api/v1/run/flow-1":
+            return _Resp(status_code=200, payload={"ok": True})
+        raise AssertionError(f"unexpected request: {method} {path}")
+
+    with (
+        patch("services.langflow_file_service.clients.langflow_request", new=AsyncMock(side_effect=_request)) as req_mock,
+        patch("config.settings.get_openrag_config", return_value=_config("anthropic")),
+    ):
+        await service.run_url_ingestion_flow("https://example.com/mixed", crawl_depth=2)
+
+    post_call = [c for c in req_mock.call_args_list if c.args[:2] == ("POST", "/api/v1/run/flow-1")][0]
+    headers = post_call.kwargs["headers"]
+
+    assert headers["X-LANGFLOW-GLOBAL-VAR-OPENAI_API_KEY"] == "openai-key"
+    assert headers["X-LANGFLOW-GLOBAL-VAR-ANTHROPIC_API_KEY"] == "anthropic-key"
+    assert headers["X-LANGFLOW-GLOBAL-VAR-WATSONX_APIKEY"] == "wx-key"
+    assert headers["X-LANGFLOW-GLOBAL-VAR-WATSONX_PROJECT_ID"] == "wx-proj"
+    assert headers["X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL"].endswith(":11434")
 
 
 @pytest.mark.asyncio
@@ -199,11 +290,11 @@ async def test_url_ingestion_retry_failure_returns_provider_specific_message():
 
 
 @pytest.mark.asyncio
-async def test_integration_style_selected_provider_mcp_and_self_heal_flow():
-    """Integration-style (mocked HTTP): MCP provider pruning + URL self-heal retry."""
+async def test_integration_style_all_providers_mcp_and_self_heal_flow():
+    """Integration-style (mocked HTTP): all-provider MCP vars + URL self-heal retry."""
     cfg = _config("openai")
 
-    # 1) Build selected-provider MCP vars and patch existing MCP args (with stale ollama header).
+    # 1) Build all-provider MCP vars and patch existing MCP args.
     mcp_vars = await build_mcp_global_vars_from_config(cfg, flows_service=None)
     mcp_service = LangflowMCPService()
     args = [
@@ -215,8 +306,11 @@ async def test_integration_style_selected_provider_mcp_and_self_heal_flow():
     updated_args = mcp_service._upsert_global_var_headers_in_args(args, mcp_vars)
     updated_joined = " ".join(updated_args)
     assert "X-Langflow-Global-Var-OPENAI_API_KEY openai-key" in updated_joined
+    assert "X-Langflow-Global-Var-ANTHROPIC_API_KEY anthropic-key" in updated_joined
+    assert "X-Langflow-Global-Var-WATSONX_APIKEY wx-key" in updated_joined
+    assert "X-Langflow-Global-Var-WATSONX_PROJECT_ID wx-proj" in updated_joined
+    assert "X-Langflow-Global-Var-OLLAMA_BASE_URL" in updated_joined
     assert "X-Langflow-Global-Var-SELECTED_EMBEDDING_MODEL text-embedding-3-small" in updated_joined
-    assert "X-Langflow-Global-Var-OLLAMA_BASE_URL" not in updated_joined
 
     # 2) URL ingestion stale-state first error -> one reconcile -> retry success.
     service = LangflowFileService(flows_service=None)
@@ -250,6 +344,9 @@ async def test_integration_style_selected_provider_mcp_and_self_heal_flow():
     post_call = [c for c in req_mock.call_args_list if c.args[:2] == ("POST", "/api/v1/run/flow-1")][0]
     headers = post_call.kwargs["headers"]
     assert "X-LANGFLOW-GLOBAL-VAR-OPENAI_API_KEY" in headers
-    assert "X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL" not in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-ANTHROPIC_API_KEY" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_APIKEY" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-WATSONX_PROJECT_ID" in headers
+    assert "X-LANGFLOW-GLOBAL-VAR-OLLAMA_BASE_URL" in headers
     assert result == {"ok": True}
     assert calls["run"] == 2

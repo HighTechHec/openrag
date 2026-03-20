@@ -22,19 +22,62 @@ def _config(selected_provider: str):
     )
 
 
+def _config_single_provider(selected_provider: str):
+    provider = selected_provider.lower().strip()
+    return SimpleNamespace(
+        knowledge=SimpleNamespace(
+            embedding_model="text-embedding-3-small",
+            embedding_provider=provider,
+        ),
+        providers=SimpleNamespace(
+            openai=SimpleNamespace(
+                api_key="openai-key" if provider == "openai" else "",
+                configured=provider == "openai",
+            ),
+            anthropic=SimpleNamespace(
+                api_key="anthropic-key" if provider == "anthropic" else "",
+                configured=provider == "anthropic",
+            ),
+            watsonx=SimpleNamespace(
+                api_key="wx-key" if provider == "watsonx" else "",
+                project_id="wx-proj" if provider == "watsonx" else "",
+                endpoint="https://wx",
+                configured=provider == "watsonx",
+            ),
+            ollama=SimpleNamespace(
+                endpoint="http://localhost:11434" if provider == "ollama" else "",
+                configured=provider == "ollama",
+            ),
+        ),
+    )
+
+
 @pytest.mark.asyncio
-async def test_build_mcp_global_vars_only_selected_provider():
-    cfg = _config("openai")
+async def test_build_mcp_global_vars_single_provider_selection_only_emits_that_provider():
+    cfg = _config_single_provider("openai")
 
     vars_out = await build_mcp_global_vars_from_config(cfg, flows_service=None)
 
     assert vars_out["OPENAI_API_KEY"] == "openai-key"
     assert vars_out["SELECTED_EMBEDDING_MODEL"] == "text-embedding-3-small"
-    # Provider-agnostic contract: no non-selected provider vars.
-    assert "OLLAMA_BASE_URL" not in vars_out
     assert "ANTHROPIC_API_KEY" not in vars_out
     assert "WATSONX_APIKEY" not in vars_out
     assert "WATSONX_PROJECT_ID" not in vars_out
+    assert "OLLAMA_BASE_URL" not in vars_out
+
+
+@pytest.mark.asyncio
+async def test_build_mcp_global_vars_includes_all_configured_providers():
+    cfg = _config("openai")
+
+    vars_out = await build_mcp_global_vars_from_config(cfg, flows_service=None)
+
+    assert vars_out["OPENAI_API_KEY"] == "openai-key"
+    assert vars_out["ANTHROPIC_API_KEY"] == "anthropic-key"
+    assert vars_out["WATSONX_APIKEY"] == "wx-key"
+    assert vars_out["WATSONX_PROJECT_ID"] == "wx-proj"
+    assert vars_out["OLLAMA_BASE_URL"].endswith(":11434")
+    assert vars_out["SELECTED_EMBEDDING_MODEL"] == "text-embedding-3-small"
 
 
 def test_patch_mcp_server_args_prunes_stale_provider_headers():
@@ -61,7 +104,7 @@ def test_patch_mcp_server_args_prunes_stale_provider_headers():
 
 
 @pytest.mark.asyncio
-async def test_update_mcp_servers_applies_selected_provider_only():
+async def test_update_mcp_servers_applies_all_provider_credentials():
     svc = LangflowMCPService()
 
     server_detail = {
@@ -84,14 +127,24 @@ async def test_update_mcp_servers_applies_selected_provider_only():
             args = kwargs["json"]["args"]
             args_joined = " ".join(args)
             assert "X-Langflow-Global-Var-OPENAI_API_KEY new-openai" in args_joined
+            assert "X-Langflow-Global-Var-ANTHROPIC_API_KEY new-anthropic" in args_joined
+            assert "X-Langflow-Global-Var-WATSONX_APIKEY new-wx" in args_joined
+            assert "X-Langflow-Global-Var-WATSONX_PROJECT_ID new-wx-proj" in args_joined
+            assert "X-Langflow-Global-Var-OLLAMA_BASE_URL http://localhost:11434" in args_joined
             assert "X-Langflow-Global-Var-SELECTED_EMBEDDING_MODEL text-embedding-3-small" in args_joined
-            assert "X-Langflow-Global-Var-OLLAMA_BASE_URL" not in args_joined
             return patch_resp
         raise AssertionError(f"unexpected call: {method} {endpoint}")
 
     with patch("services.langflow_mcp_service.clients.langflow_request", new=AsyncMock(side_effect=_request)):
         result = await svc.update_mcp_servers_with_global_vars(
-            {"OPENAI_API_KEY": "new-openai", "SELECTED_EMBEDDING_MODEL": "text-embedding-3-small"}
+            {
+                "OPENAI_API_KEY": "new-openai",
+                "ANTHROPIC_API_KEY": "new-anthropic",
+                "WATSONX_APIKEY": "new-wx",
+                "WATSONX_PROJECT_ID": "new-wx-proj",
+                "OLLAMA_BASE_URL": "http://localhost:11434",
+                "SELECTED_EMBEDDING_MODEL": "text-embedding-3-small",
+            }
         )
 
     assert result == {"updated": 1, "failed": 0, "total": 1}
