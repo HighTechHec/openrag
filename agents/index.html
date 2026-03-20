@@ -11,7 +11,7 @@
 <script>!function(){function e(){if(void 0!==window.truste&&window.truste.cma){var e=window.truste.cma.callApi("getConsent",window.location.href)||{},n=1===e[2],t=1===e[3];gtag("consent","update",{ad_storage:n?"granted":"denied",ad_user_data:n?"granted":"denied",ad_personalization:n?"granted":"denied",analytics_storage:t?"granted":"denied"})}}window.addEventListener&&(window.addEventListener("cm_data_subject_consent_changed",e),window.addEventListener("cm_consent_preferences_set",e)),"complete"===document.readyState?e():window.addEventListener("load",e)}()</script>
 <script>window._ibmAnalytics={settings:{name:"DataStax",tealiumProfileName:"ibm-subsidiary"},trustarc:{privacyPolicyLink:"https://ibm.com/privacy"}},window.digitalData={page:{pageInfo:{ibm:{siteId:"IBM_DataStax"}},category:{primaryCategory:"PC230"}}}</script>
 <script src="//1.www.s81c.com/common/stats/ibm-common.js" async="true"></script><link rel="stylesheet" href="/assets/css/styles.dd48e280.css">
-<script src="/assets/js/runtime~main.26b4adbe.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.bbd44fe8.js" defer="defer"></script>
 <script src="/assets/js/main.311c24ae.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -40,9 +40,15 @@ You can also create your own flows.</p><p>To edit any flow, you must first <a hr
 <p>In OpenRAG, click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings2 lucide-settings-2" aria-hidden="true"><path d="M14 17H5"></path><path d="M19 7h-9"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg> <strong>Settings</strong>, and then find the <strong>Agent</strong> section.</p>
 </li>
 <li class="">
-<p>If you only need to edit the language model or agent instructions, edit those fields directly on the <strong>Settings</strong> page.
+<p>To change the active language model or agent instructions, edit those fields directly on the <strong>Settings</strong> page.
 Language model changes are saved automatically.
 To apply new instructions, click <strong>Save Agent Instructions</strong>.</p>
+</li>
+<li class="">
+<p>To add a new language model, edit the model provider settings or configure an additional provider on the <strong>Settings</strong> page, and then select the new model in the <strong>Agent</strong> section.</p>
+<div class="theme-admonition theme-admonition-info admonition_xJq3 alert alert--info"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path></svg></span>info</div><div class="admonitionContent_BuS1"><p>On the <strong>Settings</strong> page, you can add, edit, and remove model providers.</p><p>OpenRAG functionality requires at least one language model and one embedding model.
+If there are no models available, most OpenRAG functionality will fail until you reconfigure one model of each type.</p><p>If you remove providers or models that you previously used for chat or ingestion, you might experience errors or unexpected behaviors.
+For more information, see <a class="" href="/ingestion-configure#best-practices-for-multiple-embedding-models">Best practices for multiple embedding models</a>.</p></div></div>
 </li>
 <li class="">
 <p>To edit all flow settings and components with full customization capabilities, edit the flow in the Langflow visual editor:</p>
