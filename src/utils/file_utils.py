@@ -104,8 +104,14 @@ def clean_connector_filename(filename: str, mimetype: str) -> str:
 def get_filename_aliases(filename: str) -> list[str]:
     """Return equivalent filename variants used by ingestion/indexing.
 
-    Legacy Langflow ingest may index `.txt` uploads as `.md`. This helper keeps
-    duplicate detection/deletion consistent by checking both forms.
+    Legacy Langflow ingest indexes `.txt` uploads as `.md` (see
+    `LangflowFileProcessor`). The alias always uses a lowercase extension
+    to match the rename behavior:
+      `original_filename[:-4] + ".md"`
+    So `"FOO.TXT"` aliases to `"FOO.md"`, not `"FOO.MD"`.
+
+    This helper keeps duplicate detection/deletion consistent by checking
+    both `.txt` and `.md` forms.
     """
     normalized = (filename or "").strip()
     if not normalized:

@@ -123,12 +123,14 @@ async def check_filename_exists(
         from utils.opensearch_queries import build_filename_search_body
         from utils.file_utils import get_filename_aliases
 
-        candidate_filenames = get_filename_aliases(filename) or [filename]
+        candidate_filenames = get_filename_aliases(filename)
+        if not candidate_filenames:
+            return JSONResponse({"exists": False, "filename": filename}, status_code=200)
 
         logger.debug("Checking filename existence", filename=filename, index_name=get_index_name())
+        exists = False
 
         try:
-            exists = False
             for candidate in candidate_filenames:
                 search_body = build_filename_search_body(candidate, size=1, source=["filename"])
                 response = await opensearch_client.search(

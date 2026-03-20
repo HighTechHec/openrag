@@ -76,11 +76,22 @@ class TaskProcessor:
         max_retries = 3
         retry_delay = 1.0
 
-        candidate_filenames = get_filename_aliases(filename) or [filename]
+        candidate_filenames = get_filename_aliases(filename)
+        if not candidate_filenames:
+            return False
+        # Keep track of aliases that still need checking across retries.
+        # If one alias was already checked successfully with no hits, we avoid
+        # re-querying it when another alias fails transiently.
+        pending_candidates = list(candidate_filenames)
+        # Retry strategy: only retry aliases that have not completed successfully.
+        # This avoids re-querying aliases already checked with no hits when a later
+        # alias fails transiently (e.g., timeout).
 
         for attempt in range(max_retries):
             try:
-                for candidate in candidate_filenames:
+                i = 0
+                while i < len(pending_candidates):
+                    candidate = pending_candidates[i]
                     search_body = build_filename_search_body(
                         candidate, size=1, source=False
                     )
@@ -91,6 +102,10 @@ class TaskProcessor:
                     hits = response.get("hits", {}).get("hits", [])
                     if hits:
                         return True
+                    # Successfully checked this alias with no hits; don't
+                    # re-query it on future retries.
+                    pending_candidates.pop(i)
+                    continue
                 return False
 
             except (asyncio.TimeoutError, Exception) as e:
@@ -131,7 +146,13 @@ class TaskProcessor:
 
         try:
             deleted_count = 0
-            candidate_filenames = get_filename_aliases(filename) or [filename]
+            candidate_filenames = get_filename_aliases(filename)
+            if not candidate_filenames:
+                logger.info(
+                    "Skipped delete_by_filename due to empty filename input",
+                    filename=filename,
+                )
+                return
             for candidate in candidate_filenames:
                 delete_body = build_filename_delete_body(candidate)
                 response = await opensearch_client.delete_by_query(
