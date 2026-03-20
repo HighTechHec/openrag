@@ -21,6 +21,22 @@ The chunks, embeddings, and associated metadata (which connect chunks of the sam
 
 To modify chunking behavior, embedding model, and other ingestion settings, see [Configure ingestion](/ingestion-configure).
 
+## Supported file types {#supported-file-types}
+
+OpenRAG has verified (tested) support for the following file types:
+
+* .csv
+* .docx
+* .html
+* .md
+* .pdf
+* .pptx
+* .tex
+* .xlsx
+
+You can attempt to ingest any other file type supported by Docling, but the ingestion might fail or produce suboptimal results.
+You can submit an [OpenRAG GitHub issue](https://github.com/langflow-ai/openrag/issues) to request support for specific file types or report ingestion errors.
+
 ## Ingest local files and folders
 
 You can upload files and folders from your local machine to your knowledge base:
@@ -40,32 +56,6 @@ The selected files are processed in the background through the **OpenSearch Inge
 
 You can [monitor ingestion](#monitor-ingestion) to see the progress of the uploads and check for failed uploads.
 
-### Supported file types {#supported-file-types}
-
-When ingesting from the local file system or cloud storage connectors, OpenRAG supports the following file types:
-
-* .adoc
-* .asc
-* .asciidoc
-* .csv
-* .docx
-* .htm
-* .html
-* .js
-* .json
-* .md
-* .mdx
-* .pdf
-* .py
-* .sh
-* .sql
-* .ts
-* .tsx
-* .txt
-* .xhtml
-* .xml
-* .yaml
-* .yml
 
 ### Ingest local files temporarily
 
