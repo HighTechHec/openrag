@@ -169,25 +169,57 @@ async def test_ingest_format(tmp_path, fmt, ext, content, req_docling, ingestion
 
         # ------------------------------------------------------------------
         # Step 4 — Confirm file appears in the index (30 s window)
+        #
+        # Query OpenSearch directly via the admin client (basic-auth) rather than
+        # through the /documents/check-filename API endpoint.
+        #
+        # Rationale: that API endpoint creates a per-user OpenSearch client that
+        # sends "Authorization: Bearer <jwt>" to OpenSearch.  If OpenSearch has no
+        # OIDC configured (the common case in local/test deployments) those tokens
+        # are unrecognised and every query returns 0 hits — even when documents ARE
+        # indexed.  The admin client uses the same basic-auth credentials that the
+        # Langflow ingest flow uses, so it sees the real index state.
+        #
+        # Note on .txt → .md rename: processors.py renames *.txt uploads to *.md
+        # before sending to Langflow (Langflow compatibility).  The document is
+        # therefore indexed with the renamed filename, not the original .txt name.
+        # We check both so the text format is tested correctly.
         # ------------------------------------------------------------------
+        from config.settings import clients as _os_clients, get_index_name as _get_index
+
+        # Build the set of filenames to check (handles .txt → .md server-side rename)
+        filenames_to_check = [filename]
+        if ext == ".txt":
+            filenames_to_check.append(filename[:-4] + ".md")
+
         deadline = asyncio.get_event_loop().time() + 30
         found = False
-        last_resp = None
+        found_as = None
+        last_err = None
         while asyncio.get_event_loop().time() < deadline:
-            check_resp = await client.get(
-                f"/documents/check-filename?filename={filename}"
-            )
-            if check_resp.status_code == 200 and check_resp.json().get("exists"):
-                found = True
-                break
-            last_resp = check_resp
+            try:
+                resp = await _os_clients.opensearch.search(
+                    index=_get_index(),
+                    body={
+                        "query": {"terms": {"filename": filenames_to_check}},
+                        "size": 1,
+                        "_source": ["filename"],
+                    },
+                )
+                hits = resp.get("hits", {}).get("hits", [])
+                if hits:
+                    found = True
+                    found_as = hits[0].get("_source", {}).get("filename", filename)
+                    break
+            except Exception as e:
+                last_err = e
             await asyncio.sleep(1)
 
         if not found:
             reason = (
-                f"'{filename}' not found in index within 30 s — task completed but "
-                f"document was not indexed. "
-                f"Last check: {last_resp.text if last_resp else 'none'}"
+                f"'{filename}' not found in index within 30 s (admin query) — "
+                f"task completed but document was not indexed. "
+                + (f"Last error: {last_err}" if last_err else "")
             )
             _record_failure(ingestion_report, fmt, "index verification", reason)
             return
@@ -196,7 +228,11 @@ async def test_ingest_format(tmp_path, fmt, ext, content, req_docling, ingestion
         # All steps passed
         # ------------------------------------------------------------------
         ingestion_report[fmt] = {"status": "PASSED"}
-        _print_result(fmt, passed=True, detail=f"{filename} ({len(file_bytes)} bytes)")
+        indexed_name = found_as if found_as != filename else filename
+        detail = f"{indexed_name} ({len(file_bytes)} bytes)"
+        if found_as and found_as != filename:
+            detail += f"  [stored as '{found_as}' — server renamed from '{filename}']"
+        _print_result(fmt, passed=True, detail=detail)
 
     finally:
         await client.aclose()
