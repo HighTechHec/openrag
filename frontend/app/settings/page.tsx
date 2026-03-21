@@ -84,6 +84,9 @@ function KnowledgeSourcesPage() {
   const [systemPrompt, setSystemPrompt] = useState<string>("");
   const [chunkSize, setChunkSize] = useState<number>(1024);
   const [chunkOverlap, setChunkOverlap] = useState<number>(50);
+  const [chunkValidationError, setChunkValidationError] = useState<
+    string | null
+  >(null);
   const [tableStructure, setTableStructure] = useState<boolean>(true);
   const [ocr, setOcr] = useState<boolean>(false);
   const [pictureDescriptions, setPictureDescriptions] =
@@ -356,14 +359,24 @@ function KnowledgeSourcesPage() {
   const handleChunkSizeChange = (value: string) => {
     const numValue = Math.max(0, parseInt(value) || 0);
     setChunkSize(numValue);
-    debouncedUpdate({ chunk_size: numValue });
+    if (chunkOverlap >= numValue) {
+      setChunkValidationError("Chunk overlap must be less than chunk size");
+    } else {
+      setChunkValidationError(null);
+      debouncedUpdate({ chunk_size: numValue });
+    }
   };
 
   // Update chunk overlap setting with debounce
   const handleChunkOverlapChange = (value: string) => {
     const numValue = Math.max(0, parseInt(value) || 0);
     setChunkOverlap(numValue);
-    debouncedUpdate({ chunk_overlap: numValue });
+    if (numValue >= chunkSize) {
+      setChunkValidationError("Chunk overlap must be less than chunk size");
+    } else {
+      setChunkValidationError(null);
+      debouncedUpdate({ chunk_overlap: numValue });
+    }
   };
 
   // Update docling settings
@@ -951,7 +964,7 @@ function KnowledgeSourcesPage() {
                       min="0"
                       value={chunkOverlap}
                       onChange={(e) => handleChunkOverlapChange(e.target.value)}
-                      className="w-full pr-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className={`w-full pr-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none${chunkValidationError ? " border-destructive" : ""}`}
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center">
                       <span className="text-sm text-placeholder-foreground mr-4 pointer-events-none">
@@ -988,6 +1001,11 @@ function KnowledgeSourcesPage() {
                     </div>
                   </div>
                 </LabelWrapper>
+                {chunkValidationError && (
+                  <p className="text-sm text-destructive mt-1">
+                    {chunkValidationError}
+                  </p>
+                )}
               </div>
             </div>
             <div className="">
