@@ -332,7 +332,8 @@ class AppClients:
         self.docling_http_client = None
 
     async def initialize(self):
-        # Initialize OpenSearch client
+        os_auth = None if IBM_AUTH_ENABLED else (OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD)
+
         self.opensearch = AsyncOpenSearch(
             hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
             connection_class=AIOHttpConnection,
@@ -340,7 +341,7 @@ class AppClients:
             use_ssl=True,
             verify_certs=False,
             ssl_assert_fingerprint=None,
-            http_auth=(OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD),
+            http_auth=os_auth,
             http_compress=True,
         )
 
@@ -394,7 +395,7 @@ class AppClients:
         # Initialize Langflow client with generated/provided API key
         if LANGFLOW_KEY and self.langflow_client is None:
             try:
-                if not OPENSEARCH_PASSWORD:
+                if not OPENSEARCH_PASSWORD and not IBM_AUTH_ENABLED:
                     raise ValueError("OPENSEARCH_PASSWORD is not set")
                 else:
                     await self.ensure_langflow_client()

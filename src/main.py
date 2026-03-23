@@ -1020,8 +1020,15 @@ async def health_check(request: Request):
 
 async def opensearch_health_ready(request):
     """Readiness probe: verifies OpenSearch dependency is reachable."""
+    from config.settings import IBM_AUTH_ENABLED
+
+    if IBM_AUTH_ENABLED:
+        return JSONResponse(
+            {"status": "ready", "note": "IBM auth mode - health checked per-request"},
+            status_code=200,
+        )
+
     try:
-        # Fast check that the cluster is reachable/auth works
         await asyncio.wait_for(clients.opensearch.info(), timeout=5.0)
         return JSONResponse(
             {"status": "ready", "dependencies": {"opensearch": "up"}},
