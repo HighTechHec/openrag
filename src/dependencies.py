@@ -15,6 +15,7 @@ Usage:
         ...
 """
 
+import asyncio
 import dataclasses
 from typing import Optional
 
@@ -110,6 +111,17 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
     from auth.ibm_auth import extract_ibm_credentials
     from config.settings import IBM_SESSION_COOKIE_NAME, IBM_CREDENTIALS_HEADER
 
+    def _trigger_deferred_startup_if_needed(user: User):
+        services = request.app.state.services
+        if services.get("_ibm_deferred_startup_pending"):
+            services["_ibm_deferred_startup_pending"] = False
+            from main import run_deferred_ibm_startup_tasks
+            task = asyncio.create_task(
+                run_deferred_ibm_startup_tasks(services, user.jwt_token)
+            )
+            request.app.state.background_tasks.add(task)
+            task.add_done_callback(request.app.state.background_tasks.discard)
+
     # ── Option 0: Configurable credentials header (Traefik production) ───
     # TODO: remove log this after testing
 
@@ -150,6 +162,7 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             opensearch_credentials=lh_credentials,
         )
         request.state.user = user
+        _trigger_deferred_startup_if_needed(user)
         return user
 
     # ── Option 1: ibm-openrag-session cookie (production via Traefik) ───
@@ -183,6 +196,7 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             opensearch_credentials=opensearch_credentials,
         )
         request.state.user = user
+        _trigger_deferred_startup_if_needed(user)
         return user
 
     if ibm_token and not user_id:
@@ -206,6 +220,7 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             opensearch_credentials=auth_header,
         )
         request.state.user = user
+        _trigger_deferred_startup_if_needed(user)
         return user
 
     # ── Neither present ──────────────────────────────────────────────────

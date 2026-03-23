@@ -796,6 +796,7 @@ async def _reingest_default_docs_on_upgrade_if_needed(
     task_service,
     langflow_file_service,
     session_manager,
+    jwt_token=None,
 ):
     """Reingest default OpenRAG docs once when app version changes."""
     config = get_openrag_config()
@@ -824,6 +825,7 @@ async def _reingest_default_docs_on_upgrade_if_needed(
         task_service,
         langflow_file_service,
         session_manager,
+        jwt_token=jwt_token,
     )
     config.onboarding.openrag_docs_ingested_version = current_version
     if _should_use_url_default_docs_ingest():
@@ -895,6 +897,7 @@ async def refresh_default_openrag_docs(
     session_manager,
     force: bool = False,
     reason: str = "startup",
+    jwt_token=None,
 ):
     """Refresh OpenRAG docs if remote content changed or when forced."""
     await TelemetryClient.send_event(
@@ -982,6 +985,7 @@ async def refresh_default_openrag_docs(
             task_service,
             langflow_file_service,
             session_manager,
+            jwt_token=jwt_token,
         )
         config.onboarding.openrag_docs_ingested_version = OPENRAG_VERSION
         # Keep docs version/signature metadata consistent after a refresh.
@@ -1131,6 +1135,38 @@ async def _update_mcp_servers_with_provider_credentials(services):
         # Don't fail startup if MCP update fails
 
 
+async def run_deferred_ibm_startup_tasks(services, jwt_token):
+    """Run startup tasks that were deferred in IBM mode, using the first user's JWT."""
+    logger.info("Running deferred IBM startup tasks with user credentials")
+    upgrade_reingested = False
+    try:
+        upgrade_reingested = await _reingest_default_docs_on_upgrade_if_needed(
+            services["document_service"],
+            services["task_service"],
+            services["langflow_file_service"],
+            services["session_manager"],
+            jwt_token=jwt_token,
+        )
+    except Exception as e:
+        logger.warning("Deferred docs reingestion on upgrade failed", error=str(e))
+
+    if FETCH_OPENRAG_DOCS_AT_STARTUP and not upgrade_reingested:
+        try:
+            await refresh_default_openrag_docs(
+                services["document_service"],
+                services["task_service"],
+                services["langflow_file_service"],
+                services["session_manager"],
+                force=False,
+                reason="startup_deferred",
+                jwt_token=jwt_token,
+            )
+        except Exception as e:
+            logger.warning("Deferred OpenRAG docs refresh failed", error=str(e))
+
+    logger.info("Deferred IBM startup tasks completed")
+
+
 async def startup_tasks(services):
     """Startup tasks"""
     from config.settings import IBM_AUTH_ENABLED
@@ -1142,9 +1178,10 @@ async def startup_tasks(services):
 
     if IBM_AUTH_ENABLED:
         logger.info(
-            "IBM auth mode: skipping startup OpenSearch checks. "
-            "OpenSearch will be initialized during onboarding with user credentials."
+            "IBM auth mode: skipping startup OpenSearch checks and doc operations. "
+            "These will run on the first authenticated user request."
         )
+        services["_ibm_deferred_startup_pending"] = True
     else:
         # Only initialize basic OpenSearch connection, not the index
         # Index will be created after onboarding when we know the embedding model
@@ -1183,30 +1220,30 @@ async def startup_tasks(services):
         # Configure alerting security
         await configure_alerting_security()
 
-    # Reingest bundled OpenRAG docs once after application upgrade.
-    upgrade_reingested = False
-    try:
-        upgrade_reingested = await _reingest_default_docs_on_upgrade_if_needed(
-            services["document_service"],
-            services["task_service"],
-            services["langflow_file_service"],
-            services["session_manager"],
-        )
-    except Exception as e:
-        logger.warning("Default docs reingestion on upgrade failed", error=str(e))
-
-    if FETCH_OPENRAG_DOCS_AT_STARTUP and not upgrade_reingested:
+        # Reingest bundled OpenRAG docs once after application upgrade.
+        upgrade_reingested = False
         try:
-            await refresh_default_openrag_docs(
+            upgrade_reingested = await _reingest_default_docs_on_upgrade_if_needed(
                 services["document_service"],
                 services["task_service"],
                 services["langflow_file_service"],
                 services["session_manager"],
-                force=False,
-                reason="startup",
             )
         except Exception as e:
-            logger.warning("OpenRAG docs startup refresh failed", error=str(e))
+            logger.warning("Default docs reingestion on upgrade failed", error=str(e))
+
+        if FETCH_OPENRAG_DOCS_AT_STARTUP and not upgrade_reingested:
+            try:
+                await refresh_default_openrag_docs(
+                    services["document_service"],
+                    services["task_service"],
+                    services["langflow_file_service"],
+                    services["session_manager"],
+                    force=False,
+                    reason="startup",
+                )
+            except Exception as e:
+                logger.warning("OpenRAG docs startup refresh failed", error=str(e))
 
     # Update MCP servers with provider credentials (especially important for no-auth mode)
     await _update_mcp_servers_with_provider_credentials(services)
@@ -1367,6 +1404,7 @@ async def create_app():
     app = FastAPI(title="OpenRAG API", version=OPENRAG_VERSION, debug=True)
     app.state.services = services  # Store services for cleanup
     app.state.background_tasks = set()
+    services["_ibm_deferred_startup_pending"] = False
 
     # Register route handlers — auth and service injection done via FastAPI Depends() in each handler
 
