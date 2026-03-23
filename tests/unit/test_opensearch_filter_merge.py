@@ -182,6 +182,59 @@ class TestMergeFilterClausesIntoSearchBody:
         merge_filter_clauses_into_search_body(body, [TERM_DOC])
         assert body == original
 
+    def test_top_level_knn_gets_per_field_filter_not_bare_query_filter(self):
+        """Top-level ``knn`` must be scoped via each field's ``filter``, not only ``query``."""
+        scope = {"bool": {"filter": [TERM_DOC]}}
+        body = {
+            "size": 5,
+            "knn": {
+                "chunk_embedding_x": {
+                    "vector": [0.1, 0.2],
+                    "k": 10,
+                }
+            },
+        }
+        out = merge_filter_clauses_into_search_body(body, [TERM_DOC])
+        assert "query" not in out
+        assert out["knn"]["chunk_embedding_x"]["filter"] == scope
+        assert out["size"] == 5
+
+    def test_top_level_knn_with_existing_query_injects_knn_and_merges_query(self):
+        scope = {"bool": {"filter": [TERM_DOC]}}
+        body = {
+            "knn": {"field_a": {"vector": [1.0], "k": 5}},
+            "query": {"match": {"text": "hello"}},
+        }
+        out = merge_filter_clauses_into_search_body(body, [TERM_DOC])
+        assert out["knn"]["field_a"]["filter"] == scope
+        assert out["query"] == {
+            "bool": {
+                "must": [{"match": {"text": "hello"}}],
+                "filter": [TERM_DOC],
+            }
+        }
+
+    def test_top_level_knn_preserves_existing_field_filter(self):
+        scope = {"bool": {"filter": [TERM_DOC]}}
+        body = {
+            "knn": {
+                "vec": {
+                    "vector": [0.0],
+                    "k": 3,
+                    "filter": {"term": {"owner": "x"}},
+                }
+            },
+        }
+        out = merge_filter_clauses_into_search_body(body, [TERM_DOC])
+        assert out["knn"]["vec"]["filter"] == {
+            "bool": {
+                "must": [
+                    {"term": {"owner": "x"}},
+                    scope,
+                ]
+            }
+        }
+
 
 class TestApplyChatFilterLimitsToBody:
     def test_none_filter_returns_deep_copy(self):

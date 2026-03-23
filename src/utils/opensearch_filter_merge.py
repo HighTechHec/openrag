@@ -76,32 +76,66 @@ def coerce_filter_clauses_from_filter_obj(filter_obj: dict | str | None) -> list
     return context_clauses
 
 
+def _append_to_bool_filter(bool_q: dict[str, Any], filter_clauses: list[dict]) -> None:
+    existing = bool_q.get("filter")
+    if existing is None:
+        bool_q["filter"] = list(filter_clauses)
+    elif isinstance(existing, list):
+        bool_q["filter"] = [*existing, *filter_clauses]
+    else:
+        bool_q["filter"] = [existing, *filter_clauses]
+
+
+def _inject_filter_into_top_level_knn(
+    knn_payload: dict[str, Any], filter_clauses: list[dict]
+) -> dict[str, Any]:
+    """Add OpenSearch kNN ``filter`` to each vector field in a top-level ``knn`` block."""
+    out = copy.deepcopy(knn_payload)
+    scope = {"bool": {"filter": list(filter_clauses)}}
+    for _field, spec in out.items():
+        if not isinstance(spec, dict):
+            continue
+        existing = spec.get("filter")
+        if existing is None:
+            spec["filter"] = scope
+        else:
+            spec["filter"] = {"bool": {"must": [existing, scope]}}
+    return out
+
+
 def merge_filter_clauses_into_search_body(
     body: dict[str, Any], filter_clauses: list[dict]
 ) -> dict[str, Any]:
     """AND filter clauses into a search body. Does not mutate ``body``.
 
-    - If there is no top-level ``query``, uses ``{"bool": {"filter": clauses}}``.
+    - If there is no top-level ``query``, uses ``{"bool": {"filter": clauses}}`` — unless
+      the body only has a top-level ``knn`` block (see below).
     - If ``query`` is already a ``bool`` query, appends to ``bool.filter`` (or wraps
       a single existing filter in a list).
     - Otherwise wraps the existing ``query`` as ``bool.must`` and sets ``bool.filter``.
+
+    OpenSearch allows a **top-level** ``knn`` block (sibling of ``query``). Filters on
+    ``query`` alone do not constrain that kNN execution; we inject the same clauses
+    into each field's ``filter`` in the top-level ``knn`` map (see OpenSearch kNN docs).
     """
     if not filter_clauses:
         return copy.deepcopy(body)
     merged = copy.deepcopy(body)
+
+    knn_block = merged.get("knn")
+    if isinstance(knn_block, dict) and knn_block:
+        merged["knn"] = _inject_filter_into_top_level_knn(knn_block, filter_clauses)
+
     q = merged.get("query")
     if q is None:
+        # Avoid adding query={bool:filter} alone when kNN is already scoped above —
+        # that combination can leave top-level kNN unscoped relative to the filter query.
+        if isinstance(merged.get("knn"), dict) and merged["knn"]:
+            return merged
         merged["query"] = {"bool": {"filter": filter_clauses}}
         return merged
     if isinstance(q, dict) and "bool" in q:
-        bool_q = q["bool"]
-        existing = bool_q.get("filter")
-        if existing is None:
-            bool_q["filter"] = list(filter_clauses)
-        elif isinstance(existing, list):
-            bool_q["filter"] = [*existing, *filter_clauses]
-        else:
-            bool_q["filter"] = [existing, *filter_clauses]
+        _append_to_bool_filter(q["bool"], filter_clauses)
         return merged
     merged["query"] = {"bool": {"must": [q], "filter": filter_clauses}}
     return merged
