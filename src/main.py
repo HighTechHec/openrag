@@ -138,7 +138,7 @@ class _VisibleTextHTMLParser(HTMLParser):
         return " ".join(self._chunks)
 
 
-async def wait_for_opensearch():
+async def wait_for_opensearch(opensearch_client=None):
     """Wait for OpenSearch to be ready, delegating to the shared utility."""
     from utils.opensearch_utils import (
         wait_for_opensearch as _wait_for_opensearch,
@@ -146,7 +146,7 @@ async def wait_for_opensearch():
     )
 
     try:
-        await _wait_for_opensearch(clients.opensearch)
+        await _wait_for_opensearch(opensearch_client or clients.opensearch)
         await TelemetryClient.send_event(
             Category.OPENSEARCH_SETUP, MessageId.ORB_OS_CONN_ESTABLISHED
         )
@@ -215,10 +215,11 @@ async def _ensure_opensearch_index():
         # The service can still function, document operations might fail later
 
 
-async def init_index():
+async def init_index(opensearch_client=None):
     """Initialize OpenSearch index and security roles"""
+    os_client = opensearch_client or clients.opensearch
     try:
-        await wait_for_opensearch()
+        await wait_for_opensearch(opensearch_client)
 
         # Get the configured embedding model from user configuration
         config = get_openrag_config()
@@ -236,8 +237,8 @@ async def init_index():
 
         # Create documents index
         index_name = get_index_name()
-        if not await clients.opensearch.indices.exists(index=index_name):
-            await clients.opensearch.indices.create(
+        if not await os_client.indices.exists(index=index_name):
+            await os_client.indices.create(
                 index=index_name, body=dynamic_index_body
             )
             logger.info(
@@ -277,10 +278,10 @@ async def init_index():
             }
         }
 
-        if not await clients.opensearch.indices.exists(
+        if not await os_client.indices.exists(
             index=knowledge_filter_index_name
         ):
-            await clients.opensearch.indices.create(
+            await os_client.indices.create(
                 index=knowledge_filter_index_name, body=knowledge_filter_index_body
             )
             logger.info(
@@ -297,8 +298,8 @@ async def init_index():
             )
 
         # Create API keys index for public API authentication
-        if not await clients.opensearch.indices.exists(index=API_KEYS_INDEX_NAME):
-            await clients.opensearch.indices.create(
+        if not await os_client.indices.exists(index=API_KEYS_INDEX_NAME):
+            await os_client.indices.create(
                 index=API_KEYS_INDEX_NAME, body=API_KEYS_INDEX_BODY
             )
             logger.info("Created API keys index", index_name=API_KEYS_INDEX_NAME)
@@ -308,7 +309,7 @@ async def init_index():
                 index_name=API_KEYS_INDEX_NAME,
             )
 
-        # Configure alerting plugin security settings
+        # Configure alerting plugin security settings (admin-level, always uses global client)
         await configure_alerting_security()
 
     except Exception as e:
@@ -324,10 +325,10 @@ async def init_index():
         raise e
 
 
-async def init_index_when_ready():
+async def init_index_when_ready(opensearch_client=None):
     """Wait for the OpenSearch service to be ready and then initialize the OpenSearch index."""
-    await wait_for_opensearch()
-    await init_index()
+    await wait_for_opensearch(opensearch_client)
+    await init_index(opensearch_client)
 
 
 def generate_jwt_keys():
