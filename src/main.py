@@ -1130,46 +1130,55 @@ async def _update_mcp_servers_with_provider_credentials(services):
 
 async def startup_tasks(services):
     """Startup tasks"""
+    from config.settings import IBM_AUTH_ENABLED
+
     logger.info("Starting startup tasks")
     await TelemetryClient.send_event(
         Category.APPLICATION_STARTUP, MessageId.ORB_APP_START_INIT
     )
-    # Only initialize basic OpenSearch connection, not the index
-    # Index will be created after onboarding when we know the embedding model
-    await wait_for_opensearch()
 
-    if DISABLE_INGEST_WITH_LANGFLOW:
-        await _ensure_opensearch_index()
-
-    # Ensure that the OpenSearch index exists if onboarding was already completed
-    # - Handles the case where OpenSearch is reset (e.g., volume deleted) after onboarding
-    embedding_model = None
-    try:
-        config = get_openrag_config()
-        embedding_model = config.knowledge.embedding_model
-
-        if config.edited and embedding_model:
-            logger.info(
-                "Ensuring that the OpenSearch index exists (after onboarding)...",
-                embedding_model=embedding_model,
-            )
-
-            await init_index()
-
-            logger.info(
-                "Successfully ensured that the OpenSearch index exists (after onboarding).",
-                embedding_model=embedding_model,
-            )
-    except Exception as e:
-        logger.error(
-            "Failed to ensure that the OpenSearch index exists (after onboarding).",
-            embedding_model=embedding_model,
-            error=str(e),
+    if IBM_AUTH_ENABLED:
+        logger.info(
+            "IBM auth mode: skipping startup OpenSearch checks. "
+            "OpenSearch will be initialized during onboarding with user credentials."
         )
-        raise
+    else:
+        # Only initialize basic OpenSearch connection, not the index
+        # Index will be created after onboarding when we know the embedding model
+        await wait_for_opensearch()
 
-    # Configure alerting security
-    await configure_alerting_security()
+        if DISABLE_INGEST_WITH_LANGFLOW:
+            await _ensure_opensearch_index()
+
+        # Ensure that the OpenSearch index exists if onboarding was already completed
+        # - Handles the case where OpenSearch is reset (e.g., volume deleted) after onboarding
+        embedding_model = None
+        try:
+            config = get_openrag_config()
+            embedding_model = config.knowledge.embedding_model
+
+            if config.edited and embedding_model:
+                logger.info(
+                    "Ensuring that the OpenSearch index exists (after onboarding)...",
+                    embedding_model=embedding_model,
+                )
+
+                await init_index()
+
+                logger.info(
+                    "Successfully ensured that the OpenSearch index exists (after onboarding).",
+                    embedding_model=embedding_model,
+                )
+        except Exception as e:
+            logger.error(
+                "Failed to ensure that the OpenSearch index exists (after onboarding).",
+                embedding_model=embedding_model,
+                error=str(e),
+            )
+            raise
+
+        # Configure alerting security
+        await configure_alerting_security()
 
     # Reingest bundled OpenRAG docs once after application upgrade.
     upgrade_reingested = False
