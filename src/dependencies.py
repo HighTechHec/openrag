@@ -112,13 +112,6 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
 
     # ── Option 0: Configurable credentials header (Traefik production) ───
     lh_credentials = request.headers.get(IBM_CREDENTIALS_HEADER, "")
-    if not lh_credentials:
-        logger.warning("IBM credentials header not found in request headers")
-        raise HTTPException(status_code=401, detail="IBM authentication required")
-    if not lh_credentials.startswith("Basic "):
-        logger.warning("IBM credentials header is not a Basic credential")
-        raise HTTPException(status_code=401, detail="IBM authentication required")
-    
     ibm_token = request.cookies.get(IBM_SESSION_COOKIE_NAME)
     user_id = None
     email = None
@@ -166,9 +159,12 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             )
             if connections:
                 lh_credentials = connections[0].config.get("basic_credentials")
-        opensearch_username = None
-        if lh_credentials and lh_credentials.startswith("Basic "):
-            opensearch_username, _ = extract_ibm_credentials(lh_credentials)
+        if not lh_credentials or not lh_credentials.startswith("Basic "):
+            raise HTTPException(
+                status_code=401,
+                detail="IBM credentials not found. Please ensure the X-IBM-LH-Credentials header is sent at least once.",
+            )
+        opensearch_username, _ = extract_ibm_credentials(lh_credentials)
         user = User(
             user_id=user_id,
             email=email,
