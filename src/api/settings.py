@@ -1137,11 +1137,14 @@ async def onboarding(
                     # Import the function here to avoid circular imports
                     from main import ingest_default_documents_when_ready
 
+                    ingestion_jwt = user.jwt_token if IBM_AUTH_ENABLED and user and user.jwt_token else None
+
                     task_id = await ingest_default_documents_when_ready(
                         document_service,
                         task_service,
                         langflow_file_service,
                         session_manager,
+                        jwt_token=ingestion_jwt,
                     )
                     current_config.onboarding.openrag_docs_ingested_version = OPENRAG_VERSION
                     from main import (

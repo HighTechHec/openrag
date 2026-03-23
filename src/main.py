@@ -407,7 +407,8 @@ def _should_use_url_default_docs_ingest() -> bool:
 
 
 async def ingest_openrag_docs_when_ready(
-    document_service, task_service, langflow_file_service, session_manager
+    document_service, task_service, langflow_file_service, session_manager,
+    jwt_token=None,
 ):
     """Ingest OpenRAG docs during onboarding."""
     use_url_ingest = _should_use_url_default_docs_ingest()
@@ -421,6 +422,7 @@ async def ingest_openrag_docs_when_ready(
                     document_service=document_service,
                     docs_url=DEFAULT_DOCS_URL,
                     crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
+                    jwt_token=jwt_token,
                 )
             else:
                 logger.info(
@@ -433,6 +435,7 @@ async def ingest_openrag_docs_when_ready(
                     task_service=task_service,
                     docs_url=DEFAULT_DOCS_URL,
                     crawl_depth=DEFAULT_DOCS_CRAWL_DEPTH,
+                    jwt_token=jwt_token,
                 )
             await TelemetryClient.send_event(
                 Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_URL_COMPLETE
@@ -445,7 +448,8 @@ async def ingest_openrag_docs_when_ready(
 
 
 async def ingest_default_documents_when_ready(
-    document_service, task_service, langflow_file_service, session_manager
+    document_service, task_service, langflow_file_service, session_manager,
+    jwt_token=None,
 ):
     """Ingest default OpenRAG docs during onboarding."""
     try:
@@ -458,7 +462,8 @@ async def ingest_default_documents_when_ready(
             Category.DOCUMENT_INGESTION, MessageId.ORB_DOC_DEFAULT_START
         )
         await ingest_openrag_docs_when_ready(
-            document_service, task_service, langflow_file_service, session_manager
+            document_service, task_service, langflow_file_service, session_manager,
+            jwt_token=jwt_token,
         )
 
         base_dir = _get_documents_dir()
@@ -484,11 +489,13 @@ async def ingest_default_documents_when_ready(
 
         if DISABLE_INGEST_WITH_LANGFLOW:
             await _ingest_default_documents_openrag(
-                document_service, task_service, file_paths
+                document_service, task_service, file_paths,
+                jwt_token=jwt_token,
             )
         else:
             await _ingest_default_documents_langflow(
-                langflow_file_service, session_manager, task_service, file_paths
+                langflow_file_service, session_manager, task_service, file_paths,
+                jwt_token=jwt_token,
             )
 
         await TelemetryClient.send_event(
@@ -504,7 +511,8 @@ async def ingest_default_documents_when_ready(
 
 
 async def _ingest_default_documents_langflow(
-    langflow_file_service, session_manager, task_service, file_paths
+    langflow_file_service, session_manager, task_service, file_paths,
+    jwt_token=None,
 ):
     """Ingest default documents using Langflow upload-ingest-delete pipeline."""
 
@@ -513,22 +521,15 @@ async def _ingest_default_documents_langflow(
         file_count=len(file_paths),
     )
 
-    # Use AnonymousUser details for default documents
     from session_manager import AnonymousUser
 
     anonymous_user = AnonymousUser()
+    effective_jwt = jwt_token
 
-    # Get JWT token using same logic as DocumentFileProcessor
-    # This will handle anonymous JWT creation if needed for anonymous user
-    effective_jwt = None
-
-    # Let session manager handle anonymous JWT creation if needed
-    if session_manager:
-        # This call will create anonymous JWT if needed (same as DocumentFileProcessor)
+    if not effective_jwt and session_manager:
         session_manager.get_user_opensearch_client(
             anonymous_user.user_id, effective_jwt
         )
-        # Get the JWT that was created by session manager
         if hasattr(session_manager, "_anonymous_jwt"):
             effective_jwt = session_manager._anonymous_jwt
 
@@ -574,6 +575,7 @@ async def _ingest_default_documents_url_langflow(
     task_service,
     docs_url: str,
     crawl_depth: int,
+    jwt_token=None,
 ):
     """Ingest default URL docs using the Langflow URL ingestion pipeline."""
     if not docs_url:
@@ -588,9 +590,9 @@ async def _ingest_default_documents_url_langflow(
     from session_manager import AnonymousUser
 
     anonymous_user = AnonymousUser()
-    effective_jwt = None
+    effective_jwt = jwt_token
 
-    if session_manager:
+    if not effective_jwt and session_manager:
         session_manager.get_user_opensearch_client(
             anonymous_user.user_id, effective_jwt
         )
@@ -633,6 +635,7 @@ async def _ingest_default_documents_url(
     document_service,
     docs_url: str,
     crawl_depth: int,
+    jwt_token=None,
 ):
     """Ingest default docs from URL using OpenRAG ingestion logic (no Langflow)."""
     if not docs_url:
@@ -654,7 +657,7 @@ async def _ingest_default_documents_url(
         processor = DocumentFileProcessor(
             document_service,
             owner_user_id=None,
-            jwt_token=None,
+            jwt_token=jwt_token,
             owner_name=None,
             owner_email=None,
             is_sample_data=True,
@@ -665,7 +668,7 @@ async def _ingest_default_documents_url(
             file_hash=hash_id(temp_file_path),
             owner_user_id=None,
             original_filename="openrag-url-default.txt",
-            jwt_token=None,
+            jwt_token=jwt_token,
             owner_name=None,
             owner_email=None,
             file_size=os.path.getsize(temp_file_path),
@@ -1036,7 +1039,8 @@ async def opensearch_health_ready(request):
 
 
 async def _ingest_default_documents_openrag(
-    document_service, task_service, file_paths, connector_type: str = "local"
+    document_service, task_service, file_paths, connector_type: str = "local",
+    jwt_token=None,
 ):
     """Ingest default documents using traditional OpenRAG processor."""
     logger.info(
@@ -1044,16 +1048,15 @@ async def _ingest_default_documents_openrag(
         file_count=len(file_paths),
     )
 
-    # Build a processor that DOES NOT set 'owner' on documents (owner_user_id=None)
     from models.processors import DocumentFileProcessor
 
     processor = DocumentFileProcessor(
         document_service,
         owner_user_id=None,
-        jwt_token=None,
+        jwt_token=jwt_token,
         owner_name=None,
         owner_email=None,
-        is_sample_data=True,  # Mark as sample data
+        is_sample_data=True,
         connector_type=connector_type,
     )
 
