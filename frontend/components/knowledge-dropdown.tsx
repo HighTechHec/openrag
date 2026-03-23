@@ -52,6 +52,9 @@ import { cn } from "@/lib/utils";
  *
  * documents: txt, md, html, htm, adoc, asciidoc, asc, pdf, docx
  * spreadsheets: csv
+ *
+ * TODO: Re-add other MIME/extension groups (images, xlsx/xls/ppt, rtf/odt, etc.)
+ * once ingestion is verified end-to-end in Langflow; keep this list and ingestion.mdx in sync.
  */
 export const SUPPORTED_FILE_TYPES = {
   "text/plain": [".txt"],
