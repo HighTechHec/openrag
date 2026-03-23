@@ -521,7 +521,7 @@ factory-reset: ## Complete reset (stop, remove volumes, clear data, remove image
 	fi; \
 	echo ""; \
 	echo "$(YELLOW)Stopping all services and removing volumes...$(NC)"; \
-	$(COMPOSE_CMD) down -v --remove-orphans --rmi local || true; \
+	$(COMPOSE_CMD) down -v --remove-orphans || true; \
 	echo "$(YELLOW)Removing local data directories...$(NC)"; \
 	if [ -d "opensearch-data" ]; then \
 		echo "Removing opensearch-data..."; \
