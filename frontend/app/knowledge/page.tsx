@@ -22,6 +22,7 @@ import "@/components/AgGrid/registerAgGridModules";
 import "@/components/AgGrid/agGridStyles.css";
 import { toast } from "sonner";
 import { KnowledgeActionsDropdown } from "@/components/knowledge-actions-dropdown";
+import { KnowledgeSearchBar } from "@/components/knowledge-search-bar";
 import { KnowledgeSearchInput } from "@/components/knowledge-search-input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -29,7 +30,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsCloudBrand } from "@/contexts/brand-context";
 import { parseTimestampMs } from "@/lib/time-utils";
+import { cn } from "@/lib/utils";
 import {
   DeleteConfirmationDialog,
   formatFilesToDelete,
@@ -74,6 +77,7 @@ function getSourceIcon(connectorType?: string) {
 }
 
 function SearchPage() {
+  const isCloudBrand = useIsCloudBrand();
   const queryClient = useQueryClient();
   const router = useRouter();
   const {
@@ -591,97 +595,107 @@ function SearchPage() {
     <>
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">Project Knowledge</h2>
+          <h2
+            className={cn(
+              "text-lg font-semibold",
+              isCloudBrand && "ibm-section-title",
+            )}
+          >
+            Project knowledge
+          </h2>
         </div>
+        {isCloudBrand ? (
+          <KnowledgeSearchBar />
+        ) : (
+          /* Search Input Area */
+          <div className="flex-1 flex items-center flex-shrink-0 flex-wrap-reverse gap-3 mb-6">
+            <KnowledgeSearchInput />
 
-        {/* Search Input Area */}
-        <div className="flex-1 flex items-center flex-shrink-0 flex-wrap-reverse gap-3 mb-6">
-          <KnowledgeSearchInput />
-
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-lg flex-shrink-0"
-            disabled={syncAllConnectorsMutation.isPending}
-            onClick={async () => {
-              try {
-                toast.info("Syncing all cloud connectors...");
-                const result = await syncAllConnectorsMutation.mutateAsync();
-                if (result.status === "no_files") {
-                  toast.info(
-                    result.message ||
-                      "No cloud files to sync. Add files from cloud connectors first.",
-                  );
-                } else if (
-                  result.synced_connectors &&
-                  result.synced_connectors.length > 0
-                ) {
-                  toast.success(
-                    `Sync started for ${result.synced_connectors.join(", ")}. Check task notifications for progress.`,
-                  );
-                } else if (result.errors && result.errors.length > 0) {
-                  toast.error("Some connectors failed to sync");
-                }
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to sync connectors",
-                );
-              }
-            }}
-          >
-            {syncAllConnectorsMutation.isPending ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Syncing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync
-              </>
-            )}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-lg flex-shrink-0"
-            disabled={refreshOpenragDocsMutation.isPending}
-            onClick={async () => {
-              try {
-                toast.info("Refreshing OpenRAG docs...");
-                const result = await refreshOpenragDocsMutation.mutateAsync();
-                toast.success(result.message);
-              } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Failed to refresh OpenRAG docs",
-                );
-              }
-            }}
-          >
-            {refreshOpenragDocsMutation.isPending ? (
-              <>Refreshing docs...</>
-            ) : (
-              <>Fetch latest docs</>
-            )}
-          </Button>
-          {selectedRows.length > 0 && (
             <Button
               type="button"
-              variant="destructive"
+              variant="outline"
               className="rounded-lg flex-shrink-0"
-              onClick={() => setShowBulkDeleteDialog(true)}
+              disabled={syncAllConnectorsMutation.isPending}
+              onClick={async () => {
+                try {
+                  toast.info("Syncing all cloud connectors...");
+                  const result = await syncAllConnectorsMutation.mutateAsync();
+                  if (result.status === "no_files") {
+                    toast.info(
+                      result.message ||
+                        "No cloud files to sync. Add files from cloud connectors first.",
+                    );
+                  } else if (
+                    result.synced_connectors &&
+                    result.synced_connectors.length > 0
+                  ) {
+                    toast.success(
+                      `Sync started for ${result.synced_connectors.join(", ")}. Check task notifications for progress.`,
+                    );
+                  } else if (result.errors && result.errors.length > 0) {
+                    toast.error("Some connectors failed to sync");
+                  }
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to sync connectors",
+                  );
+                }
+              }}
             >
-              Delete
+              {syncAllConnectorsMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync
+                </>
+              )}
             </Button>
-          )}
-          <div className="ml-auto">
-            <KnowledgeDropdown />
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg flex-shrink-0"
+              disabled={refreshOpenragDocsMutation.isPending}
+              onClick={async () => {
+                try {
+                  toast.info("Refreshing OpenRAG docs...");
+                  const result = await refreshOpenragDocsMutation.mutateAsync();
+                  toast.success(result.message);
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to refresh OpenRAG docs",
+                  );
+                }
+              }}
+            >
+              {refreshOpenragDocsMutation.isPending ? (
+                <>Refreshing docs...</>
+              ) : (
+                <>Fetch latest docs</>
+              )}
+            </Button>
+            {selectedRows.length > 0 && (
+              <Button
+                type="button"
+                variant="destructive"
+                className="rounded-lg flex-shrink-0"
+                onClick={() => setShowBulkDeleteDialog(true)}
+              >
+                Delete
+              </Button>
+            )}
+            <div className="ml-auto">
+              <KnowledgeDropdown />
+            </div>
           </div>
-        </div>
+        )}
         <AgGridReact
           className="w-full overflow-auto"
           columnDefs={columnDefs as ColDef<File>[]}
