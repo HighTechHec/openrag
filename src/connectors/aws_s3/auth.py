@@ -88,3 +88,49 @@ def create_s3_client(config: Dict[str, Any]):
     kwargs = _build_boto3_kwargs(creds)
     logger.debug("Creating S3 client with HMAC authentication (boto3)")
     return boto3.client("s3", **kwargs)
+
+
+def verify_s3_credentials(config: Dict[str, Any]) -> None:
+    """Verify that the S3 credentials in *config* are valid and grant sufficient access.
+
+    Uses the minimal AWS permission available for the caller's IAM policy:
+
+    - When ``bucket_names`` are configured: calls ``HeadBucket`` on each bucket,
+      which requires only ``s3:ListBucket`` scoped to that bucket.
+    - When no buckets are configured: calls ``ListBuckets`` (``s3:ListAllMyBuckets``).
+      An ``AccessDenied`` response is treated as valid credentials — the user simply
+      has a bucket-scoped policy and has not configured specific buckets yet.
+      Any other error (e.g. ``InvalidAccessKeyId``) propagates as a genuine failure.
+
+    Raises:
+        ValueError: If credentials cannot be resolved from *config* or env vars.
+        botocore.exceptions.ClientError: If the credentials are invalid or the
+            bucket(s) are inaccessible (except for the ``AccessDenied`` case above).
+        ImportError: If boto3/botocore is not installed.
+    """
+    try:
+        import botocore.exceptions
+    except ImportError as exc:
+        raise ImportError(
+            "botocore is required for the S3 connector. "
+            "Install it with: pip install boto3"
+        ) from exc
+
+    client = create_s3_client(config)
+    bucket_names: list = config.get("bucket_names") or []
+
+    if bucket_names:
+        for bucket in bucket_names:
+            client.head_bucket(Bucket=bucket)
+    else:
+        try:
+            client.list_buckets()
+        except botocore.exceptions.ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code", "")
+            if error_code == "AccessDenied":
+                logger.warning(
+                    "S3 credentials valid but lack s3:ListAllMyBuckets. "
+                    "Proceeding — configure bucket_names to enable auto-discovery."
+                )
+                return
+            raise

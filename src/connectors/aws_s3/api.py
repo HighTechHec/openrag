@@ -10,7 +10,7 @@ from dependencies import get_connector_service, get_session_manager, get_current
 from session_manager import User
 from utils.logging_config import get_logger
 
-from .auth import create_s3_resource
+from .auth import create_s3_resource, verify_s3_credentials
 from .models import S3ConfigureBody
 from .support import build_s3_config
 
@@ -68,8 +68,7 @@ async def s3_configure(
 
     # Test credentials
     try:
-        s3 = create_s3_resource(conn_config)
-        list(s3.buckets.all())
+        verify_s3_credentials(conn_config)
     except Exception:
         logger.exception("Failed to connect to S3 during credential test.")
         return JSONResponse(

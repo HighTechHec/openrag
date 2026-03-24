@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from connectors.base import BaseConnector, ConnectorDocument, DocumentACL
 from utils.logging_config import get_logger
 
-from .auth import create_s3_client, create_s3_resource
+from .auth import create_s3_client, create_s3_resource, verify_s3_credentials
 
 logger = get_logger(__name__)
 
@@ -98,15 +98,19 @@ class S3Connector(BaseConnector):
     # ------------------------------------------------------------------
 
     async def authenticate(self) -> bool:
-        """Validate credentials by listing accessible buckets."""
+        """Validate credentials using the minimal required AWS permission.
+
+        Delegates to ``verify_s3_credentials`` which probes ``HeadBucket`` when
+        bucket names are configured (requires only ``s3:ListBucket`` per bucket)
+        or ``ListBuckets`` otherwise (gracefully treats ``AccessDenied`` as valid).
+        """
         try:
-            resource = self._get_resource()
-            list(resource.buckets.all())
+            verify_s3_credentials(self.config)
             self._authenticated = True
-            logger.debug(f"S3 authenticated for connection {self.connection_id}")
+            logger.debug("S3 authenticated for connection %s", self.connection_id)
             return True
         except Exception as exc:
-            logger.warning(f"S3 authentication failed: {exc}")
+            logger.warning("S3 authentication failed: %s", exc)
             self._authenticated = False
             return False
 
