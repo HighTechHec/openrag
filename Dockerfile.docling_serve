@@ -20,8 +20,17 @@ RUN uv pip install --system \
     "docling-core==2.48.1" \
     opencv-python-headless
 
+# Set global model cache directories so any user running the container can access them
+ENV HF_HOME=/app/models/huggingface \
+    EASYOCR_MODULE_PATH=/app/models/easyocr
+
+# Pre-download all models (EasyOCR, Docling Layout, VLM) into global directories
+RUN mkdir -p /app/models && \
+    python -c "import easyocr; easyocr.Reader(['en']); from docling.document_converter import DocumentConverter; from docling.datamodel.document import InputFormat; converter = DocumentConverter(); converter.format_to_options[InputFormat.PDF].pipeline_options.do_picture_description = True; converter.initialize_pipeline(InputFormat.PDF)" && \
+    chmod -R 777 /app/models
+
 # Expose port
-EXPOSE 8000
+EXPOSE 5001
 
 # Start server
-CMD ["docling-serve", "run", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["docling-serve", "run", "--host", "0.0.0.0", "--port", "5001", "--workers", "2", "--enable-ui"]
