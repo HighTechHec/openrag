@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 WORKDIR /app
 
@@ -11,11 +11,8 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv (fast package runner)
-RUN pip install --no-cache-dir uv
-
 # Install docling-serve with all extras
-RUN uv pip install \
+RUN uv pip install --system \
     "docling-serve[ui]==1.5.0" \
     onnxruntime \
     easyocr \
