@@ -11,9 +11,9 @@ import { UserMessage } from "@/app/chat/_components/user-message";
 import type { Message } from "@/app/chat/_types/types";
 import OnboardingCard from "@/app/onboarding/_components/onboarding-card";
 import { useChat } from "@/contexts/chat-context";
-import { useChatStreaming } from "@/hooks/useChatStreaming";
 import type { FilterInput } from "@/lib/filter-normalization";
 import { buildSearchPayloadFilters } from "@/lib/filter-normalization";
+import { useChatStreamStore } from "@/stores/chatStreamStore";
 
 import { OnboardingStep } from "./onboarding-step";
 import OnboardingUpload from "./onboarding-upload";
@@ -83,61 +83,77 @@ export function OnboardingContent({
     }
   }, [handleStepBack, currentStep]);
 
-  const { streamingMessage, isLoading, sendMessage } = useChatStreaming({
-    onComplete: async (message, newResponseId) => {
-      setAssistantMessage(message);
-      // Save assistant message to backend
-      await updateOnboardingMutation.mutateAsync({
-        assistant_message: {
-          role: message.role,
-          content: message.content,
-          timestamp: message.timestamp.toISOString(),
-        },
-      });
+  const streamingMessage = useChatStreamStore(
+    (state) => state.streamingMessage,
+  );
+  const isLoading = useChatStreamStore((state) => state.isLoading);
+  const sendMessage = useChatStreamStore((state) => state.sendMessage);
+  const setCallbacks = useChatStreamStore((state) => state.setCallbacks);
 
-      if (newResponseId) {
-        setResponseId(newResponseId);
+  useEffect(() => {
+    setCallbacks({
+      onComplete: async (message, newResponseId) => {
+        setAssistantMessage(message);
+        // Save assistant message to backend
+        await updateOnboardingMutation.mutateAsync({
+          assistant_message: {
+            role: message.role,
+            content: message.content,
+            timestamp: message.timestamp.toISOString(),
+          },
+        });
 
-        // Set the current conversation ID
-        setCurrentConversationId(newResponseId);
+        if (newResponseId) {
+          setResponseId(newResponseId);
 
-        // Get filter ID from backend settings
-        const openragDocsFilterId =
-          settings?.onboarding?.openrag_docs_filter_id;
-        if (openragDocsFilterId) {
-          try {
-            // Load the filter and set it in the context with explicit responseId
-            // This ensures the filter is saved to localStorage with the correct conversation ID
-            const filter = await getFilterById(openragDocsFilterId);
-            if (filter) {
-              // Pass explicit newResponseId to ensure correct localStorage association
-              setConversationFilter(filter, newResponseId);
-              console.log(
-                "[ONBOARDING] Saved filter association:",
-                `conversation_filter_${newResponseId}`,
-                "=",
-                openragDocsFilterId,
+          // Set the current conversation ID
+          setCurrentConversationId(newResponseId);
+
+          // Get filter ID from backend settings
+          const openragDocsFilterId =
+            settings?.onboarding?.openrag_docs_filter_id;
+          if (openragDocsFilterId) {
+            try {
+              // Load the filter and set it in the context with explicit responseId
+              // This ensures the filter is saved to localStorage with the correct conversation ID
+              const filter = await getFilterById(openragDocsFilterId);
+              if (filter) {
+                // Pass explicit newResponseId to ensure correct localStorage association
+                setConversationFilter(filter, newResponseId);
+                console.log(
+                  "[ONBOARDING] Saved filter association:",
+                  `conversation_filter_${newResponseId}`,
+                  "=",
+                  openragDocsFilterId,
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Failed to associate filter with conversation:",
+                error,
               );
             }
-          } catch (error) {
-            console.error(
-              "Failed to associate filter with conversation:",
-              error,
-            );
           }
         }
-      }
-    },
-    onError: (error) => {
-      console.error("Chat error:", error);
-      setAssistantMessage({
-        role: "assistant",
-        content:
-          "Sorry, I couldn't connect to the chat service. Please try again.",
-        timestamp: new Date(),
-      });
-    },
-  });
+      },
+      onError: (error) => {
+        console.error("Chat error:", error);
+        setAssistantMessage({
+          role: "assistant",
+          content:
+            "Sorry, I couldn't connect to the chat service. Please try again.",
+          timestamp: new Date(),
+          error: true,
+        });
+      },
+    });
+  }, [
+    setCallbacks,
+    updateOnboardingMutation,
+    settings,
+    setCurrentConversationId,
+    setConversationFilter,
+  ]);
 
   const NUDGES = ["What is OpenRAG?"];
 
@@ -178,6 +194,7 @@ export function OnboardingContent({
       );
       await sendMessage({
         prompt: nudge,
+        endpoint: "/api/langflow",
         previousResponseId: responseId || undefined,
         // Send both filter_id and filters (selections)
         filter_id: filterToUse?.id,
