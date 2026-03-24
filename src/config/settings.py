@@ -637,6 +637,10 @@ class AppClients:
             finally:
                 self.langflow_client = None
 
+    async def close(self):
+        """Alias for cleanup() for convenience."""
+        await self.cleanup()
+
     async def langflow_request(self, method: str, endpoint: str, **kwargs):
         """Central method for all Langflow API requests.
 
