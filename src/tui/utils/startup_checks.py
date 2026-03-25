@@ -191,7 +191,7 @@ def podman_ready() -> bool:
 
 
 def compose_available() -> bool:
-    """Check if docker compose or docker-compose is available."""
+    """Check if docker compose, docker-compose, podman compose, or podman-compose is available."""
     # Try docker compose (v2)
     try:
         result = subprocess.run(
@@ -202,7 +202,19 @@ def compose_available() -> bool:
     except:
         pass
     # Try docker-compose (v1)
-    return has_cmd("docker-compose")
+    if has_cmd("docker-compose"):
+        return True
+    # Try podman compose (built-in subcommand, podman v4.7+)
+    try:
+        result = subprocess.run(
+            ["podman", "compose", "version"], capture_output=True, timeout=5
+        )
+        if result.returncode == 0:
+            return True
+    except:
+        pass
+    # Try podman-compose (standalone binary)
+    return has_cmd("podman-compose")
 
 
 # =============================================================================
@@ -280,6 +292,71 @@ def install_podman() -> bool:
             say(f"Failed: {e}")
             return False
 
+    return False
+
+
+def install_podman_compose() -> bool:
+    """Install podman-compose. Returns True if successful."""
+    # Already available?
+    try:
+        result = subprocess.run(
+            ["podman", "compose", "version"], capture_output=True, timeout=5
+        )
+        if result.returncode == 0:
+            say("podman compose is already available (built-in).")
+            return True
+    except:
+        pass
+    if has_cmd("podman-compose"):
+        say(f"podman-compose already installed: {shutil.which('podman-compose')}")
+        return True
+
+    say("podman-compose not found.")
+    if not ask_yes_no("Install podman-compose?"):
+        return False
+
+    plat = get_platform()
+
+    if plat == "macOS":
+        if not install_homebrew():
+            say("Cannot install podman-compose without Homebrew.")
+            return False
+        say("Installing podman-compose via Homebrew...")
+        try:
+            subprocess.run(["brew", "install", "podman-compose"], check=True)
+            return True
+        except Exception as e:
+            say(f"Failed: {e}")
+            return False
+
+    elif plat in ("Linux", "WSL"):
+        say("Installing podman-compose (may prompt for sudo password)...")
+        # Prefer pip3 as it always has the latest version
+        if has_cmd("pip3"):
+            try:
+                subprocess.run(["pip3", "install", "--user", "podman-compose"], check=True)
+                return True
+            except Exception as e:
+                say(f"pip3 install failed ({e}), trying package manager...")
+        try:
+            if has_cmd("apt-get"):
+                subprocess.run(["sudo", "apt-get", "update", "-y"], check=True)
+                subprocess.run(["sudo", "apt-get", "install", "-y", "podman-compose"], check=True)
+            elif has_cmd("dnf"):
+                subprocess.run(["sudo", "dnf", "install", "-y", "podman-compose"], check=True)
+            elif has_cmd("yum"):
+                subprocess.run(["sudo", "yum", "install", "-y", "podman-compose"], check=True)
+            elif has_cmd("pacman"):
+                subprocess.run(["sudo", "pacman", "-Sy", "--noconfirm", "podman-compose"], check=True)
+            else:
+                say("Unknown package manager. Please install podman-compose manually.")
+                return False
+            return True
+        except Exception as e:
+            say(f"Failed: {e}")
+            return False
+
+    say("Unsupported platform. Please install podman-compose manually.")
     return False
 
 
@@ -674,11 +751,13 @@ def run_startup_checks() -> bool:
 
     # 6. Check compose
     if not compose_available():
-        say("Docker Compose not found.")
-        say("OpenRAG requires docker-compose or 'docker compose'.")
         if runtime == "podman":
-            say("Podman typically includes compose. Try: podman compose version")
+            say("podman compose / podman-compose not found.")
+            if not install_podman_compose():
+                say("Warning: podman-compose is not available. OpenRAG may fail to start.")
         else:
+            say("Docker Compose not found.")
+            say("OpenRAG requires docker-compose or 'docker compose'.")
             say("Install docker-compose-plugin via your package manager.")
 
     print("-" * 40)
