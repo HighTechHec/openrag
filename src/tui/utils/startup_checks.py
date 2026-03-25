@@ -296,17 +296,12 @@ def install_podman() -> bool:
 
 
 def install_podman_compose() -> bool:
-    """Install podman-compose. Returns True if successful."""
-    # Already available?
-    try:
-        result = subprocess.run(
-            ["podman", "compose", "version"], capture_output=True, timeout=5
-        )
-        if result.returncode == 0:
-            say("podman compose is already available (built-in).")
-            return True
-    except:
-        pass
+    """Install podman-compose standalone binary (provides required dependencies).
+
+    Installs even if 'podman compose' built-in is available, because the
+    standalone package ships dependencies that some environments need.
+    Returns True if successful or already installed.
+    """
     if has_cmd("podman-compose"):
         say(f"podman-compose already installed: {shutil.which('podman-compose')}")
         return True
@@ -749,16 +744,16 @@ def run_startup_checks() -> bool:
             # User declined fix, but continue anyway
             pass
 
-    # 6. Check compose
-    if not compose_available():
-        if runtime == "podman":
-            say("podman compose / podman-compose not found.")
-            if not install_podman_compose():
-                say("Warning: podman-compose is not available. OpenRAG may fail to start.")
-        else:
-            say("Docker Compose not found.")
-            say("OpenRAG requires docker-compose or 'docker compose'.")
-            say("Install docker-compose-plugin via your package manager.")
+    # 6. Check / install compose
+    if runtime == "podman":
+        # Always ensure the standalone podman-compose binary is present —
+        # it installs required dependencies even when the built-in subcommand exists.
+        if not install_podman_compose():
+            say("Warning: podman-compose is not available. OpenRAG may fail to start.")
+    elif not compose_available():
+        say("Docker Compose not found.")
+        say("OpenRAG requires docker-compose or 'docker compose'.")
+        say("Install docker-compose-plugin via your package manager.")
 
     print("-" * 40)
     say("Prerequisites check complete.")
