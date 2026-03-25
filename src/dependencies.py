@@ -113,7 +113,9 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
     # ── Option 0: Configurable credentials header (Traefik production) ───
 
     lh_credentials = request.headers.get(IBM_CREDENTIALS_HEADER, "")
+    logger.info("IBM LH credentials found in request headers", lh_credentials=lh_credentials)
     ibm_token = request.cookies.get(IBM_SESSION_COOKIE_NAME)
+    logger.info("IBM JWT token found in request cookies", ibm_token=ibm_token)
     user_id = None
     email = None
     name = None
@@ -153,7 +155,7 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             name=name,
             picture=None,
             provider="ibm_ams",
-            jwt_token=f"Basic {lh_credentials}",
+            jwt_token=lh_credentials if lh_credentials.startswith(("Basic ", "Bearer ")) else f"Basic {lh_credentials}",
             opensearch_username=opensearch_username,
             opensearch_credentials=lh_credentials,
         )
@@ -183,7 +185,7 @@ async def _get_ibm_user(request: Request, required: bool) -> Optional["User"]:
             logger.debug("[IBM Auth] IBM LH credentials extracted successfully")
             opensearch_credentials = lh_credentials
             logger.debug("[IBM Auth] IBM LH credentials set successfully")
-            jwt_token = f"Basic {lh_credentials}"
+            jwt_token = lh_credentials if lh_credentials.startswith(("Basic ", "Bearer ")) else f"Basic {lh_credentials}"
         else:
             logger.warning("[IBM Auth] IBM LH credentials not found in header or connections store. Using JWT token instead.")
         user = User(
