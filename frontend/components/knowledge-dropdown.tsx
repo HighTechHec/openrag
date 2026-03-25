@@ -128,9 +128,6 @@ export function KnowledgeDropdown() {
   const [s3Configured, setS3Configured] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [duplicateFilename, setDuplicateFilename] = useState<string>("");
-  const [duplicateCountForDialog, setDuplicateCountForDialog] = useState<
-    number | undefined
-  >(undefined);
   const [pendingFolderUpload, setPendingFolderUpload] = useState<{
     allFiles: File[];
     nonDuplicateFiles: File[];
@@ -148,6 +145,12 @@ export function KnowledgeDropdown() {
   }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const resetDuplicateDialogState = () => {
+    setPendingFolderUpload(null);
+    setPendingFile(null);
+    setDuplicateFilename("");
+  };
 
   // Check AWS availability and cloud connectors on mount
   useEffect(() => {
@@ -291,9 +294,9 @@ export function KnowledgeDropdown() {
 
         if (exists) {
           console.log("[Duplicate Check] Duplicate detected, showing dialog");
+          resetDuplicateDialogState();
           setPendingFile(file);
           setDuplicateFilename(file.name);
-          setDuplicateCountForDialog(undefined);
           setShowDuplicateDialog(true);
           resetFileInput();
           return;
@@ -354,9 +357,6 @@ export function KnowledgeDropdown() {
       try {
         const result = await uploadFiles(batch, replace);
         addTask(result.taskId);
-        console.log(
-          `[Folder Upload] Batch uploaded: taskId=${result.taskId}, files=${result.fileCount}`,
-        );
       } catch (error) {
         console.error("[Folder Upload] Batch upload failed:", error);
         toast.error("Batch upload failed", {
@@ -379,9 +379,7 @@ export function KnowledgeDropdown() {
       toast.success(
         `Processed ${allFiles.length} file(s), including ${duplicateCount} overwrite(s)${unsupportedMessage}`,
       );
-      setPendingFolderUpload(null);
-      setDuplicateFilename("");
-      setDuplicateCountForDialog(undefined);
+      resetDuplicateDialogState();
       return;
     }
 
@@ -397,9 +395,7 @@ export function KnowledgeDropdown() {
 
       await uploadFile(pendingFile, true);
 
-      setPendingFile(null);
-      setDuplicateFilename("");
-      setDuplicateCountForDialog(undefined);
+      resetDuplicateDialogState();
     }
   };
 
@@ -431,9 +427,7 @@ export function KnowledgeDropdown() {
         }
       }
 
-      setPendingFolderUpload(null);
-      setDuplicateFilename("");
-      setDuplicateCountForDialog(undefined);
+      resetDuplicateDialogState();
     }
 
     setShowDuplicateDialog(open);
@@ -515,14 +509,13 @@ export function KnowledgeDropdown() {
         console.log(
           `[Folder Upload] Found ${duplicateCount} duplicate file(s), showing overwrite dialog`,
         );
+        resetDuplicateDialogState();
         setPendingFolderUpload({
           allFiles: cleanFiles,
           nonDuplicateFiles,
           duplicateCount,
           unsupportedCount,
         });
-        setDuplicateFilename("");
-        setDuplicateCountForDialog(duplicateCount);
         setShowDuplicateDialog(true);
         return;
       }
@@ -780,7 +773,7 @@ export function KnowledgeDropdown() {
         onOverwrite={handleOverwriteFile}
         isLoading={fileUploading || folderLoading}
         duplicateLabel={duplicateFilename}
-        duplicateCount={duplicateCountForDialog}
+        duplicateCount={pendingFolderUpload?.duplicateCount}
       />
     </>
   );
